@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Travel Time">
+<meta name="theme-color" content="#0d0d0d">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>Travel Time Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0d0d0d;
+    --paper: #f5f0e8;
+    --amber: #c8873a;
+    --rust: #8b3a1a;
+    --cream: #ede8dc;
+    --line: #c8b89a;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  html, body { height: 100%; overscroll-behavior: none; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'DM Mono', monospace;
+    min-height: 100dvh;
+    padding: calc(var(--safe-top) + 1.5rem) 1.25rem calc(var(--safe-bottom) + 1.5rem);
+    background-image:
+      radial-gradient(ellipse at 20% 0%, rgba(200,135,58,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 100%, rgba(139,58,26,0.08) 0%, transparent 50%);
+  }
+
+  .label-tag {
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--amber);
+    font-weight: 500;
+    margin-bottom: 0.3rem;
+  }
+
+  h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2.4rem;
+    line-height: 1.05;
+    color: var(--ink);
+    font-style: italic;
+    margin-bottom: 1.5rem;
+  }
+
+  h1 span { font-style: normal; color: var(--amber); }
+
+  .card {
+    background: var(--cream);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    padding: 1.25rem;
+    margin-bottom: 0.75rem;
+    position: relative;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px; height: 100%;
+    background: var(--amber);
+    border-radius: 2px 0 0 2px;
+  }
+
+  .card-title {
+    font-size: 0.6rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--rust);
+    font-weight: 500;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .card-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+
+  .arrow-divider {
+    text-align: center;
+    font-size: 1.2rem;
+    color: var(--amber);
+    margin: 0.25rem 0;
+    opacity: 0.7;
+  }
+
+  .field-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .field { display: flex; flex-direction: column; gap: 0.35rem; }
+
+  .field label {
+    font-size: 0.58rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #6b5e4a;
+    font-weight: 500;
+  }
+
+  .field input, .field select {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    padding: 0.6rem 0.65rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--ink);
+    width: 100%;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .field select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23c8873a'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.65rem center;
+    padding-right: 1.8rem;
+    cursor: pointer;
+    font-size: 0.72rem;
+  }
+
+  .field input:focus, .field select:focus { outline: none; border-color: var(--amber); }
+  .field.full { grid-column: 1 / -1; }
+
+  button {
+    width: 100%;
+    padding: 0.95rem;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    border-radius: 2px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+    margin-top: 1rem;
+    transition: background 0.2s, transform 0.1s;
+    -webkit-appearance: none;
+  }
+
+  button:active { background: var(--rust); transform: scale(0.99); }
+
+  .result {
+    display: none;
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 2px;
+    padding: 1.5rem;
+    margin-top: 0.75rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .result::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at top right, rgba(200,135,58,0.15), transparent 60%);
+    pointer-events: none;
+  }
+
+  .result.show { display: block; animation: fadeIn 0.35s ease; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .result-label {
+    font-size: 0.58rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 0.5rem;
+  }
+
+  .result-time {
+    font-family: 'DM Serif Display', serif;
+    font-size: 3.2rem;
+    line-height: 1;
+    color: var(--paper);
+    margin-bottom: 1.2rem;
+  }
+
+  .result-time span {
+    font-size: 0.4em;
+    font-family: 'DM Mono', monospace;
+    color: var(--amber);
+    letter-spacing: 0.1em;
+    vertical-align: middle;
+    margin-left: 0.2rem;
+  }
+
+  .result-details {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    border-top: 1px solid rgba(200,135,58,0.3);
+    padding-top: 1rem;
+  }
+
+  .detail-item .di-label {
+    font-size: 0.55rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(245,240,232,0.45);
+    margin-bottom: 0.2rem;
+  }
+
+  .detail-item .di-value { font-size: 0.75rem; color: var(--paper); }
+
+  .error {
+    display: none;
+    background: #3a1a0d;
+    color: #f5c4a0;
+    border: 1px solid #8b3a1a;
+    border-radius: 2px;
+    padding: 0.75rem 1rem;
+    font-size: 0.75rem;
+    margin-top: 0.5rem;
+  }
+
+  .error.show { display: block; }
+
+  .offline-badge {
+    display: none;
+    position: fixed;
+    bottom: calc(var(--safe-bottom) + 1rem);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--rust);
+    color: var(--paper);
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    padding: 0.4rem 1rem;
+    border-radius: 20px;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<p class="label-tag">✦ Calculator</p>
+<h1>Travel<br><span>Duration</span></h1>
+
+<div class="card">
+  <div class="card-title">Departure</div>
+  <div class="field-group">
+    <div class="field">
+      <label>Date</label>
+      <input type="date" id="dep-date">
+    </div>
+    <div class="field">
+      <label>Local time</label>
+      <input type="time" id="dep-time">
+    </div>
+    <div class="field full">
+      <label>Time zone</label>
+      <select id="dep-tz"></select>
+    </div>
+  </div>
+</div>
+
+<div class="arrow-divider">↓</div>
+
+<div class="card">
+  <div class="card-title">Arrival</div>
+  <div class="field-group">
+    <div class="field">
+      <label>Date</label>
+      <input type="date" id="arr-date">
+    </div>
+    <div class="field">
+      <label>Local time</label>
+      <input type="time" id="arr-time">
+    </div>
+    <div class="field full">
+      <label>Time zone</label>
+      <select id="arr-tz"></select>
+    </div>
+  </div>
+</div>
+
+<button onclick="calculate()">Calculate travel duration</button>
+
+<div class="error" id="error-box"></div>
+
+<div class="result" id="result-box">
+  <div class="result-label">Total travel duration</div>
+  <div class="result-time" id="result-duration">—</div>
+  <div class="result-details">
+    <div class="detail-item">
+      <div class="di-label">Departure UTC</div>
+      <div class="di-value" id="dep-utc">—</div>
+    </div>
+    <div class="detail-item">
+      <div class="di-label">Arrival UTC</div>
+      <div class="di-value" id="arr-utc">—</div>
+    </div>
+    <div class="detail-item">
+      <div class="di-label">TZ difference</div>
+      <div class="di-value" id="tz-diff">—</div>
+    </div>
+    <div class="detail-item">
+      <div class="di-label">Travel days</div>
+      <div class="di-value" id="travel-days">—</div>
+    </div>
+  </div>
+</div>
+
+<div class="offline-badge" id="offline-badge">● Offline</div>
+
+<script>
+const TIMEZONES = [
+  ["Pacific/Midway",      "UTC−11 — Midway"],
+  ["Pacific/Honolulu",    "UTC−10 — Hawaii"],
+  ["America/Anchorage",   "UTC−9  — Alaska"],
+  ["America/Los_Angeles", "UTC−8  — Los Angeles"],
+  ["America/Denver",      "UTC−7  — Denver"],
+  ["America/Chicago",     "UTC−6  — Chicago"],
+  ["America/New_York",    "UTC−5  — New York"],
+  ["America/Caracas",     "UTC−4:30 — Venezuela"],
+  ["America/Halifax",     "UTC−4  — Halifax"],
+  ["America/St_Johns",    "UTC−3:30 — Newfoundland"],
+  ["America/Sao_Paulo",   "UTC−3  — São Paulo"],
+  ["America/Noronha",     "UTC−2  — Noronha"],
+  ["Atlantic/Azores",     "UTC−1  — Azores"],
+  ["Europe/London",       "UTC+0  — London, Lisbon"],
+  ["Europe/Paris",        "UTC+1  — Rome, Paris, Berlin"],
+  ["Europe/Athens",       "UTC+2  — Athens, Cairo"],
+  ["Europe/Moscow",       "UTC+3  — Moscow, Nairobi"],
+  ["Asia/Tehran",         "UTC+3:30 — Tehran"],
+  ["Asia/Dubai",          "UTC+4  — Dubai"],
+  ["Asia/Kabul",          "UTC+4:30 — Kabul"],
+  ["Asia/Karachi",        "UTC+5  — Karachi"],
+  ["Asia/Kolkata",        "UTC+5:30 — India"],
+  ["Asia/Kathmandu",      "UTC+5:45 — Nepal"],
+  ["Asia/Dhaka",          "UTC+6  — Dhaka"],
+  ["Asia/Yangon",         "UTC+6:30 — Myanmar"],
+  ["Asia/Bangkok",        "UTC+7  — Bangkok"],
+  ["Asia/Shanghai",       "UTC+8  — Beijing, Singapore"],
+  ["Asia/Tokyo",          "UTC+9  — Tokyo, Seoul"],
+  ["Australia/Adelaide",  "UTC+9:30 — Adelaide"],
+  ["Australia/Sydney",    "UTC+10 — Sydney"],
+  ["Pacific/Noumea",      "UTC+11 — New Caledonia"],
+  ["Pacific/Auckland",    "UTC+12 — Auckland"],
+  ["Pacific/Apia",        "UTC+13 — Samoa"],
+];
+
+function populateTimezones() {
+  ['dep-tz','arr-tz'].forEach(id => {
+    const sel = document.getElementById(id);
+    TIMEZONES.forEach(([val, label]) => {
+      const opt = document.createElement('option');
+      opt.value = val; opt.textContent = label;
+      if (val === 'Europe/Paris') opt.selected = true;
+      sel.appendChild(opt);
+    });
+  });
+}
+
+function parseToUTC(dateStr, timeStr, tzName) {
+  const utcGuess = new Date(`${dateStr}T${timeStr}:00Z`);
+  const localStr = utcGuess.toLocaleString('en-CA', {
+    timeZone: tzName,
+    year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false
+  });
+  const [datePart, timePart] = localStr.split(', ');
+  const localAsUTC = new Date(`${datePart}T${timePart}Z`);
+  return new Date(utcGuess.getTime() + (utcGuess - localAsUTC));
+}
+
+function formatUTC(d) {
+  return d.toISOString().replace('T',' ').slice(0,16)+' UTC';
+}
+
+function calculate() {
+  const errBox = document.getElementById('error-box');
+  const resBox = document.getElementById('result-box');
+  errBox.className = 'error';
+  resBox.className = 'result';
+
+  const dD = document.getElementById('dep-date').value;
+  const dT = document.getElementById('dep-time').value;
+  const dZ = document.getElementById('dep-tz').value;
+  const aD = document.getElementById('arr-date').value;
+  const aT = document.getElementById('arr-time').value;
+  const aZ = document.getElementById('arr-tz').value;
+
+  if (!dD||!dT||!aD||!aT) {
+    errBox.textContent = '⚠ Please fill in all fields.';
+    errBox.className = 'error show'; return;
+  }
+
+  const depUTC = parseToUTC(dD, dT, dZ);
+  const arrUTC = parseToUTC(aD, aT, aZ);
+  const diffMs = arrUTC - depUTC;
+
+  if (diffMs < 0) {
+    errBox.textContent = '⚠ Arrival is earlier than departure. Please check your inputs.';
+    errBox.className = 'error show'; return;
+  }
+
+  const totalMin = Math.floor(diffMs / 60000);
+  const hours = Math.floor(totalMin / 60);
+  const mins  = totalMin % 60;
+  const days  = Math.floor(hours / 24);
+
+  const depOffMs = parseToUTC(dD,dT,dZ) - new Date(`${dD}T${dT}:00Z`);
+  const arrOffMs = parseToUTC(aD,aT,aZ) - new Date(`${aD}T${aT}:00Z`);
+  const tzDiffMin = Math.round((arrOffMs - depOffMs) / 60000);
+  const tzSign = tzDiffMin >= 0 ? '+' : '−';
+  const tzH = Math.floor(Math.abs(tzDiffMin)/60);
+  const tzM = Math.abs(tzDiffMin)%60;
+  const tzStr = tzDiffMin===0 ? 'Same time zone' : `${tzSign}${tzH}h${tzM>0?tzM+'min':''}`;
+
+  document.getElementById('result-duration').innerHTML =
+    `${hours}<span>h</span> ${String(mins).padStart(2,'0')}<span>min</span>`;
+  document.getElementById('dep-utc').textContent = formatUTC(depUTC);
+  document.getElementById('arr-utc').textContent = formatUTC(arrUTC);
+  document.getElementById('tz-diff').textContent = tzStr;
+  document.getElementById('travel-days').textContent =
+    days===0 ? 'Same day' : days===1 ? '1 day' : `${days} days`;
+
+  resBox.className = 'result show';
+  resBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+populateTimezones();
+
+const today = new Date().toISOString().slice(0,10);
+document.getElementById('dep-date').value = today;
+document.getElementById('arr-date').value = today;
+document.getElementById('dep-time').value = '08:00';
+document.getElementById('arr-time').value = '12:00';
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js');
+}
+
+window.addEventListener('offline', () => {
+  document.getElementById('offline-badge').style.display = 'block';
+});
+window.addEventListener('online', () => {
+  document.getElementById('offline-badge').style.display = 'none';
+});
+</script>
+</body>
+</html>

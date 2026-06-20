@@ -404,7 +404,7 @@ func _input(event: InputEvent) -> void:
 				return
 
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		var local := event.position - position
+		var local: Vector2 = (event as InputEventMouse).position - position
 		var in_terrain := (local.x >= GRID_X and local.x < AREA_W - GRID_X
 						   and local.y >= 0.0 and local.y < AREA_H)
 		if event.pressed and in_terrain:
@@ -420,7 +420,7 @@ func _input(event: InputEvent) -> void:
 			_flame_on = false
 
 	if event is InputEventMouseMotion and _flame_on:
-		var local := event.position - position
+		var local: Vector2 = (event as InputEventMouse).position - position
 		if local.x < GRID_X or local.x >= AREA_W - GRID_X or local.y < 0.0 or local.y >= AREA_H:
 			_flame_on = false
 
@@ -570,7 +570,7 @@ func _in_bounds(col: int, row: int) -> bool:
 func _neighbors(col: int, row: int) -> Array:
 	var res: Array = []
 	for d in [[1,0],[-1,0],[0,1],[0,-1]]:
-		var nc := col + d[0]; var nr := row + d[1]
+		var nc: int = col + int(d[0]); var nr: int = row + int(d[1])
 		if _in_bounds(nc, nr):
 			res.append(nr * COLS + nc)
 	return res
@@ -578,7 +578,7 @@ func _neighbors(col: int, row: int) -> Array:
 # ── UI ────────────────────────────────────────────────────────────────────────
 
 func _refresh_label() -> void:
-	var w := WEAPONS[current_weapon]
+	var w: Dictionary = WEAPONS[current_weapon]
 	_label.text = (
 		"[1] Proiettile  [2] Bomba  [3] Missile  [4] Lanciafiamme  [5] Acido  [6] Verme"
 		+ "     ▶  %s — %s" % [w.name, w.desc]

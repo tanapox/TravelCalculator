@@ -201,7 +201,7 @@ func _on_ball_in_slot(body: Node2D, slot_idx: int) -> void:
 		return
 	ball.collected = true
 
-	var base_mult := _multipliers[slot_idx] if slot_idx < _multipliers.size() else 1
+	var base_mult: int = _multipliers[slot_idx] if slot_idx < _multipliers.size() else 1
 	var boost     := GameState.multiplier_boost()
 	var earned    := int(float(ball.money_value * base_mult) * boost)
 	GameState.add_money(earned)

@@ -13,18 +13,62 @@ var total_earned: int = 0
 var level:        int = 1
 var _up_lvls:     Dictionary = {}
 
-# ── Catalogo potenziamenti ────────────────────────────────────────────────────
+# ── Dati caricati da file ─────────────────────────────────────────────────────
 
-const UPGRADES: Array = [
-	{"id": "weapon_power", "name": "Potenza Armi",      "desc": "Danno di tutte le armi +25% per livello",       "max_level": 10, "costs": [50,120,250,500,1000,2000,4000,8000,16000,32000]},
-	{"id": "fire_rate",    "name": "Cadenza di Fuoco",   "desc": "Velocità proiettili e raffica +20% per livello","max_level": 8,  "costs": [80,160,320,650,1300,2500,5000,10000]},
-	{"id": "critical",     "name": "Colpi Critici",      "desc": "Probabilità di infliggere 3× il danno",         "max_level": 5,  "costs": [200,500,1200,3000,8000]},
-	{"id": "launchers",    "name": "Basi di Lancio",     "desc": "+2 posizioni di tiro aggiuntive per livello",   "max_level": 3,  "costs": [300,1500,6000]},
-	{"id": "penetration",  "name": "Perforazione",       "desc": "HP celle terreno -15% per livello",             "max_level": 5,  "costs": [150,350,750,1800,4000]},
-	{"id": "slots",        "name": "Slot Aggiuntivi",    "desc": "+3 caselle nella zona raccolta per livello",     "max_level": 3,  "costs": [500,2000,8000]},
-	{"id": "multiplier",   "name": "Moltiplicatori",     "desc": "Tutti i moltiplicatori degli slot scalati",     "max_level": 5,  "costs": [400,1000,2500,6000,15000]},
-	{"id": "worm_power",   "name": "Potenza Verme",      "desc": "Verme con più passi e raggio di mangiatura",    "max_level": 4,  "costs": [250,600,1500,4000]},
-]
+# Array[Dictionary] — ogni entry ha: id, name, desc, max_level, costs, connect, grid_x, grid_y
+var UPGRADES: Array = []
+
+# Soglie cumulative per i livelli 2..100; indice 0 = soglia livello 2
+var _thresholds: Array = []
+
+# ── Init ──────────────────────────────────────────────────────────────────────
+
+func _ready() -> void:
+	_load_upgrades()
+	_load_levels()
+
+func _load_upgrades() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load("res://data/upgrades.cfg") != OK:
+		push_error("GameState: impossibile caricare data/upgrades.cfg")
+		return
+	UPGRADES = []
+	for section in cfg.get_sections():
+		var costs_raw: Array = cfg.get_value(section, "costs", [])
+		var costs: Array = []
+		for v in costs_raw:
+			costs.append(int(v))
+		UPGRADES.append({
+			"id":        section,
+			"name":      str(cfg.get_value(section, "name",      section)),
+			"desc":      str(cfg.get_value(section, "desc",      "")),
+			"max_level": int(cfg.get_value(section, "max_level", 1)),
+			"costs":     costs,
+			"connect":   cfg.get_value(section, "connect", []),
+			"grid_x":    int(cfg.get_value(section, "grid_x",    0)),
+			"grid_y":    int(cfg.get_value(section, "grid_y",    0)),
+		})
+
+func _load_levels() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load("res://data/levels.cfg") != OK:
+		push_warning("GameState: impossibile caricare data/levels.cfg — uso formula predefinita")
+		_fallback_thresholds()
+		return
+	_thresholds = []
+	for lvl in range(2, 101):
+		var key := "l%d" % lvl
+		var val = cfg.get_value("thresholds", key, null)
+		if val == null:
+			break
+		_thresholds.append(int(val))
+	if _thresholds.is_empty():
+		_fallback_thresholds()
+
+func _fallback_thresholds() -> void:
+	_thresholds = []
+	for n in range(1, 100):
+		_thresholds.append(500 * n * (n + 1))
 
 # ── API pubblica ──────────────────────────────────────────────────────────────
 
@@ -39,7 +83,7 @@ func buy_upgrade(id: String) -> bool:
 	if upg.is_empty():
 		return false
 	var cur := get_upg_level(id)
-	if cur >= upg.max_level:
+	if cur >= int(upg.max_level):
 		return false
 	var cost: int = upg.costs[cur]
 	if money < cost:
@@ -75,12 +119,14 @@ func effect_text(id: String) -> String:
 		"worm_power":   return "+%d passi, raggio ×%.1f" % [l * 80, worm_eat_radius()]
 	return ""
 
-# Soglia cumulativa di money_earned per raggiungere il livello lvl
+# Soglia di total_earned per raggiungere il livello lvl (caricata da file)
 func level_threshold(lvl: int) -> int:
 	if lvl <= 1:
 		return 0
-	var n := lvl - 1
-	return 500 * n * (n + 1)
+	var idx := lvl - 2   # livello 2 → indice 0
+	if idx >= _thresholds.size():
+		return 999999999
+	return _thresholds[idx]
 
 # ── Getter effetti ────────────────────────────────────────────────────────────
 
@@ -94,7 +140,7 @@ func critical_chance() -> float:
 	return ([0.0, 0.05, 0.10, 0.20, 0.35, 0.50] as Array)[get_upg_level("critical")]
 
 func launcher_positions() -> Dictionary:
-	var n := 1 + get_upg_level("launchers")   # 1..4 posizioni per lato
+	var n := 1 + get_upg_level("launchers")
 	var presets := {
 		1: [120.0],
 		2: [65.0, 175.0],

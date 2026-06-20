@@ -1,0 +1,29 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; but the file format allows this.
+
+config_version=5
+
+[application]
+
+config/name="Incremental Biscotti"
+config/description="Un gioco incrementale fatto con Godot 4"
+config/features=PackedStringArray("4.3", "GL Compatibility")
+config/icon="res://icon.svg"
+run/main_scene="res://scenes/Main.tscn"
+
+[autoload]
+
+GameManager="*res://scripts/GameManager.gd"
+SaveManager="*res://scripts/SaveManager.gd"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/resizable=true
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

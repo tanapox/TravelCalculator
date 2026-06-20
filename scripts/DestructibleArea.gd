@@ -122,6 +122,8 @@ func _ready() -> void:
 	_sprite.position = Vector2(GRID_X, 0.0)
 	_sprite.z_index  = 1
 	_sprite.texture  = _tex
+	_sprite.region_enabled = true
+	_sprite.region_rect    = Rect2(0, 0, float(COLS * CELL), float(ROWS * CELL))
 	add_child(_sprite)
 
 	_overlay         = OverlayNode.new()
@@ -201,6 +203,11 @@ func _rebuild_row(row: int) -> void:
 
 func set_active_rows(n: int) -> void:
 	_active_rows = clampi(n, 1, ROWS)
+	_update_region()
+
+func _update_region() -> void:
+	if _sprite:
+		_sprite.region_rect = Rect2(0, 0, float(COLS * CELL), float(_active_rows * CELL))
 
 func init_noise(seed_val: int = -1) -> void:
 	if seed_val < 0:
@@ -229,6 +236,7 @@ func init_noise(seed_val: int = -1) -> void:
 
 	if _img:
 		_redraw_all(); _tex.update(_img); _rebuild_all_rows()
+		_update_region()
 
 func init_random() -> void:
 	for row: int in ROWS:

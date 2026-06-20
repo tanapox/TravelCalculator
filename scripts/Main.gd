@@ -353,9 +353,11 @@ func _update_hud() -> void:
 
 			_hud_timer.text = "⏱ %ds" % t
 
-			# Simboli: ✦ usata, ◉ pronta, ○ in arrivo
-			var s := "✦".repeat(used) + "◉".repeat(ready) + "○".repeat(coming)
-			_hud_shots.text = s
+			var parts: Array = []
+			if ready  > 0: parts.append("◉ %d armi" % ready)
+			if used   > 0: parts.append("✦ %d piazzate" % used)
+			if coming > 0: parts.append("○ %d in arrivo" % coming)
+			_hud_shots.text = "  ".join(parts)
 
 			var wname: String = DestructibleArea.WEAPONS[_terrain.current_weapon].name
 			_hud_weapon.text = "▶ " + wname

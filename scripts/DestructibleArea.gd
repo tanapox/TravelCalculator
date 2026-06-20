@@ -97,6 +97,7 @@ var _acid_cells:  Dictionary = {}
 var _vfx:         Array = []
 
 var _placed_weapons: Array = []
+var _shots_last:     int   = -1
 
 var _label: Label
 
@@ -288,6 +289,14 @@ func _draw_cell(col: int, row: int) -> void:
 func _draw() -> void:
 	_draw_launcher_panel(LEFT_LAUNCHER,  Rect2(0,              0, LAUNCHER_W, AREA_H), true)
 	_draw_launcher_panel(RIGHT_LAUNCHER, Rect2(AREA_W - LAUNCHER_W, 0, LAUNCHER_W, AREA_H), false)
+	if shots_available > 0:
+		var font: Font = ThemeDB.fallback_font
+		var txt: String = "×%d" % shots_available
+		var cy: float   = float(AREA_H) * 0.5 + 16.0
+		draw_string(font, Vector2(0.0,                       cy), txt,
+		            HORIZONTAL_ALIGNMENT_CENTER, float(LAUNCHER_W),   28, Color(1.0, 0.88, 0.2))
+		draw_string(font, Vector2(float(AREA_W - LAUNCHER_W), cy), txt,
+		            HORIZONTAL_ALIGNMENT_CENTER, float(LAUNCHER_W),   28, Color(1.0, 0.88, 0.2))
 	for pw in _placed_weapons:
 		var cx: float  = float(LAUNCHER_W) * 0.5 if not pw.from_right \
 		                 else float(AREA_W) - float(LAUNCHER_W) * 0.5
@@ -320,6 +329,11 @@ func _draw_launcher_panel(center: Vector2, rect: Rect2, faces_right: bool) -> vo
 # ── Process ───────────────────────────────────────────────────────────────────
 
 func _process(delta: float) -> void:
+	if shots_available != _shots_last:
+		_shots_last = shots_available
+		queue_redraw()
+		_refresh_label()
+
 	var terrain_dirty := false
 	var need_overlay  := false
 
@@ -448,17 +462,17 @@ func _launch(target: Vector2, weapon: Weapon) -> void:
 
 func _launch_from_panel(panel_y: float, from_right: bool, weapon: Weapon) -> void:
 	var launcher: Vector2
-	var target: Vector2
 	if from_right:
 		launcher = Vector2(float(AREA_W) - float(LAUNCHER_W) * 0.5, panel_y)
-		target   = Vector2(float(GRID_X) + float(COLS * CELL) * 0.3, panel_y)
 	else:
 		launcher = Vector2(float(LAUNCHER_W) * 0.5, panel_y)
-		target   = Vector2(float(GRID_X) + float(COLS * CELL) * 0.7, panel_y)
+	var tx: float  = randf_range(float(GRID_X) + float(CELL) * 3,
+	                             float(AREA_W - LAUNCHER_W) - float(CELL) * 3)
+	var ty: float  = randf_range(float(CELL) * 2, float(AREA_H) - float(CELL) * 2)
 	var spd: float = float(WEAPONS[weapon].speed) * GameState.projectile_speed_mult()
 	_projectiles.append({
 		"start":  launcher,
-		"target": target,
+		"target": Vector2(tx, ty),
 		"arc_h":  float(WEAPONS[weapon].arc_h),
 		"t":      0.0,
 		"speed":  spd,
@@ -589,7 +603,14 @@ func _neighbors(col: int, row: int) -> Array:
 
 func _refresh_label() -> void:
 	var w: Dictionary = WEAPONS[current_weapon]
+	var shots_txt: String
+	if shots_available > 0:
+		shots_txt = "   |   ◉ %d disponibili" % shots_available
+	elif _placed_weapons.size() > 0:
+		shots_txt = "   |   ✦ %d attive" % _placed_weapons.size()
+	else:
+		shots_txt = ""
 	_label.text = (
-		"[1] Proiettile  [2] Bomba  [3] Missile  [4] Lanciafiamme  [5] Acido  [6] Verme"
-		+ "     ▶  %s — %s" % [w.name, w.desc]
+		"[1]Proiettile [2]Bomba [3]Missile [4]Fiamma [5]Acido [6]Verme"
+		+ "     ▶ %s — %s%s" % [w.name, w.desc, shots_txt]
 	)

@@ -109,7 +109,9 @@ func _ready() -> void:
 	_max_hp   = PackedFloat32Array(); _max_hp.resize(COLS * ROWS)
 	_base_col = PackedColorArray();   _base_col.resize(COLS * ROWS)
 
-	init_noise()
+	# NON chiamare init_noise() qui: _hp è tutto 0 → immagine trasparente.
+	# _start_round() in Main chiama set_active_rows() + reinit() prima del
+	# primo frame visibile.
 
 	_img = Image.create(COLS * CELL, ROWS * CELL, false, Image.FORMAT_RGBA8)
 	_redraw_all()

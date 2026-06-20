@@ -3,14 +3,18 @@ extends Node2D
 
 # ── Layout ────────────────────────────────────────────────────────────────────
 
-const CELL: int  = 8          # pixel per cella
-const COLS: int  = 1280 / CELL  # 160
-const ROWS: int  = 240  / CELL  # 30
-const AREA_W: int = COLS * CELL
-const AREA_H: int = ROWS * CELL
+const CELL:       int = 8
+const LAUNCHER_W: int = 80
+const AREA_W:     int = 1280
+const AREA_H:     int = 240
+const GRID_X:     int = LAUNCHER_W
+const COLS:       int = (AREA_W - LAUNCHER_W * 2) / CELL  # 140
+const ROWS:       int = AREA_H / CELL                      # 30
+
+const LEFT_LAUNCHER:  Vector2 = Vector2(40.0,  120.0)
+const RIGHT_LAUNCHER: Vector2 = Vector2(1240.0, 120.0)
 
 # ── Palette: [Color, hp_max, nome] ───────────────────────────────────────────
-# Colori chiari = fragili, colori scuri = resistenti.
 
 const PALETTE: Array = [
 	[Color(0.95, 0.95, 0.92),  10.0,   "Gesso"],
@@ -24,61 +28,92 @@ const PALETTE: Array = [
 
 # ── Armi ─────────────────────────────────────────────────────────────────────
 
-enum Weapon { BULLET, BOMB, MISSILE, FLAMETHROWER, ACID }
+enum Weapon { BULLET, BOMB, MISSILE, FLAMETHROWER, ACID, WORM }
 
 const WEAPONS: Dictionary = {
-	Weapon.BULLET:       {key = KEY_1, name = "Proiettile",    r =  0.0, dmg = 9999.0, desc = "distrugge 1 cella"},
-	Weapon.BOMB:         {key = KEY_2, name = "Bomba",         r = 42.0, dmg =  180.0, desc = "esplosione circolare"},
-	Weapon.MISSILE:      {key = KEY_3, name = "Missile",       r = 85.0, dmg =  260.0, desc = "esplosione grande"},
-	Weapon.FLAMETHROWER: {key = KEY_4, name = "Lanciafiamme",  r = 24.0, dmg =    7.0, desc = "tieni premuto"},
-	Weapon.ACID:         {key = KEY_5, name = "Acido",         r = 14.0, dmg =    0.0, desc = "corrosivo + si espande"},
+	Weapon.BULLET:       {key=KEY_1, name="Proiettile",    color=Color(1.0, 1.0, 0.3),  proj_r=4.0,  impact_r= 0.0, dmg=9999.0, speed=2.5, desc="distrugge 1 cella"},
+	Weapon.BOMB:         {key=KEY_2, name="Bomba",         color=Color(1.0, 0.45, 0.1), proj_r=8.0,  impact_r=42.0, dmg= 180.0, speed=1.4, desc="esplosione media"},
+	Weapon.MISSILE:      {key=KEY_3, name="Missile",       color=Color(0.9, 0.9,  0.9), proj_r=6.0,  impact_r=85.0, dmg= 260.0, speed=1.8, desc="esplosione grande"},
+	Weapon.FLAMETHROWER: {key=KEY_4, name="Lanciafiamme",  color=Color(1.0, 0.55, 0.0), proj_r=5.0,  impact_r=20.0, dmg=  40.0, speed=3.2, desc="tieni premuto"},
+	Weapon.ACID:         {key=KEY_5, name="Acido",         color=Color(0.3, 1.0,  0.2), proj_r=6.0,  impact_r=14.0, dmg=   0.0, speed=1.2, desc="corrosivo + si espande"},
+	Weapon.WORM:         {key=KEY_6, name="Verme",         color=Color(0.85, 0.5, 0.1), proj_r=7.0,  impact_r= 0.0, dmg=   0.0, speed=1.0, desc="mangia il terreno a caso"},
 }
+
+# ── Inner class per overlay (sopra la texture del terrain) ───────────────────
+
+class OverlayNode extends Node2D:
+	var area: DestructibleArea
+	func _draw() -> void:
+		if area:
+			area._draw_overlay()
 
 # ── Stato ─────────────────────────────────────────────────────────────────────
 
 var current_weapon: Weapon = Weapon.BULLET
 
-var _hp:        PackedFloat32Array
-var _max_hp:    PackedFloat32Array
-var _base_col:  PackedColorArray
+var _hp:       PackedFloat32Array
+var _max_hp:   PackedFloat32Array
+var _base_col: PackedColorArray
 
-var _img: Image
-var _tex: ImageTexture
-var _sprite: Sprite2D
+var _img:     Image
+var _tex:     ImageTexture
+var _sprite:  Sprite2D
+var _overlay: OverlayNode
 
-var _acid_cells: Dictionary = {}   # idx -> forza rimanente (float)
-var _flame_on:  bool = false
+# Proiettili in volo: [{start, target, arc_h, t, speed, weapon, done}]
+var _projectiles: Array = []
+
+# Vermi attivi: [{col, row, steps, timer}]
+var _worms: Array = []
+
+# Acido: idx → forza rimanente
+var _acid_cells: Dictionary = {}
+
+# Effetti visivi esplosione: [{pos, r, max_r, dur, t, color}]
+var _vfx: Array = []
+
+var _flame_on:    bool  = false
+var _flame_timer: float = 0.0
+const FLAME_INTERVAL: float = 0.07
 
 var _label: Label
 
-# ── Inizializzazione ──────────────────────────────────────────────────────────
+# ── Init ──────────────────────────────────────────────────────────────────────
 
 func _ready() -> void:
-	_hp      = PackedFloat32Array(); _hp.resize(COLS * ROWS)
-	_max_hp  = PackedFloat32Array(); _max_hp.resize(COLS * ROWS)
-	_base_col = PackedColorArray();  _base_col.resize(COLS * ROWS)
+	_hp       = PackedFloat32Array(); _hp.resize(COLS * ROWS)
+	_max_hp   = PackedFloat32Array(); _max_hp.resize(COLS * ROWS)
+	_base_col = PackedColorArray();   _base_col.resize(COLS * ROWS)
 
-	init_noise()   # modalità default
+	init_noise()
 
-	_img = Image.create(AREA_W, AREA_H, false, Image.FORMAT_RGBA8)
+	_img = Image.create(COLS * CELL, ROWS * CELL, false, Image.FORMAT_RGBA8)
 	_redraw_all()
 
 	_tex = ImageTexture.create_from_image(_img)
-	_sprite = Sprite2D.new()
+
+	_sprite          = Sprite2D.new()
 	_sprite.centered = false
+	_sprite.position = Vector2(GRID_X, 0.0)
+	_sprite.z_index  = 1
 	_sprite.texture  = _tex
 	add_child(_sprite)
 
+	_overlay      = OverlayNode.new()
+	_overlay.area = self
+	_overlay.z_index = 5
+	add_child(_overlay)
+
 	_label = Label.new()
-	_label.position = Vector2(8.0, 4.0)
+	_label.position = Vector2(GRID_X + 8.0, 4.0)
 	_label.add_theme_font_size_override("font_size", 13)
 	_label.add_theme_color_override("font_color", Color(1.0, 1.0, 0.55, 0.92))
+	_label.z_index = 10
 	add_child(_label)
 	_refresh_label()
 
 # ── Modalità colore ───────────────────────────────────────────────────────────
 
-# RUMORE: distribuzione naturale a strati (default)
 func init_noise(seed_val: int = -1) -> void:
 	if seed_val < 0:
 		seed_val = randi()
@@ -86,23 +121,25 @@ func init_noise(seed_val: int = -1) -> void:
 	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	noise.frequency  = 0.07
 	noise.seed       = seed_val
-
 	for row in ROWS:
 		for col in COLS:
-			var n: float = (noise.get_noise_2d(col, row) + 1.0) / 2.0
-			# bias per profondità: più in basso = materiale più duro
+			var n:     float = (noise.get_noise_2d(col, row) + 1.0) / 2.0
 			var depth: float = float(row) / ROWS
-			var t: float = clampf(n * 0.45 + depth * 0.65, 0.0, 1.0)
+			var t:     float = clampf(n * 0.45 + depth * 0.65, 0.0, 1.0)
 			_set_mat(col, row, int(t * PALETTE.size()))
+	if _img:
+		_redraw_all()
+		_tex.update(_img)
 
-# CASUALE: ogni cella ha un materiale completamente random
 func init_random() -> void:
 	for row in ROWS:
 		for col in COLS:
 			_set_mat(col, row, randi() % PALETTE.size())
+	if _img:
+		_redraw_all()
+		_tex.update(_img)
 
-# IMMAGINE: pixel scuri = resistenti, pixel chiari = fragili
-# Supporta qualsiasi immagine (PNG, JPG…); viene ridimensionata a 160×30.
+# I pixel scuri dell'immagine diventano materiale duro, quelli chiari fragile.
 func init_from_image(path: String) -> bool:
 	var src := Image.load_from_file(path)
 	if not src:
@@ -114,16 +151,14 @@ func init_from_image(path: String) -> bool:
 			var px  := src.get_pixel(col, row)
 			var idx := row * COLS + col
 			_base_col[idx] = px
-			var lum: float  = px.get_luminance()
-			var hp: float   = lerpf(230.0, 10.0, lum)   # scuro→duro, chiaro→fragile
-			_max_hp[idx]    = hp
-			_hp[idx]        = hp
-	_redraw_all()
-	if _tex:
+			var hp: float  = lerpf(230.0, 10.0, px.get_luminance())
+			_max_hp[idx]   = hp
+			_hp[idx]       = hp
+	if _img:
+		_redraw_all()
 		_tex.update(_img)
 	return true
 
-# MANUALE: assegna materiale palette a singola cella (per tool esterno / editor)
 func set_cell(col: int, row: int, palette_idx: int) -> void:
 	if _in_bounds(col, row):
 		_set_mat(col, row, palette_idx)
@@ -139,7 +174,7 @@ func _set_mat(col: int, row: int, pal: int) -> void:
 	_max_hp[idx]   = PALETTE[pal][1]
 	_hp[idx]       = PALETTE[pal][1]
 
-# ── Rendering ─────────────────────────────────────────────────────────────────
+# ── Rendering terrain ─────────────────────────────────────────────────────────
 
 func _redraw_all() -> void:
 	for row in ROWS:
@@ -150,143 +185,312 @@ func _draw_cell(col: int, row: int) -> void:
 	var idx  := row * COLS + col
 	var hp   := _hp[idx]
 	var rect := Rect2i(col * CELL, row * CELL, CELL, CELL)
-
 	if hp <= 0.0:
 		_img.fill_rect(rect, Color(0, 0, 0, 0))
 		return
-
 	var ratio: float = hp / _max_hp[idx]
 	var c := _base_col[idx].darkened(1.0 - ratio * 0.78)
-
 	_img.fill_rect(rect, c)
-	# bordo griglia sottile
 	_img.fill_rect(Rect2i(col * CELL, row * CELL, CELL, 1), c.darkened(0.38))
 	_img.fill_rect(Rect2i(col * CELL, row * CELL, 1, CELL), c.darkened(0.38))
+
+# ── _draw: solo pannelli laterali (z sotto la texture) ───────────────────────
+
+func _draw() -> void:
+	_draw_launcher_panel(LEFT_LAUNCHER,  Rect2(0,              0, LAUNCHER_W, AREA_H), true)
+	_draw_launcher_panel(RIGHT_LAUNCHER, Rect2(AREA_W - LAUNCHER_W, 0, LAUNCHER_W, AREA_H), false)
+
+func _draw_launcher_panel(center: Vector2, rect: Rect2, faces_right: bool) -> void:
+	draw_rect(rect, Color(0.13, 0.13, 0.16))
+
+	# Bulloni decorativi agli angoli
+	for corner in [rect.position + Vector2(10, 10),
+				   rect.position + Vector2(rect.size.x - 10, 10),
+				   rect.position + Vector2(10, rect.size.y - 10),
+				   rect.position + Vector2(rect.size.x - 10, rect.size.y - 10)]:
+		draw_circle(corner, 5.0, Color(0.25, 0.25, 0.28))
+		draw_circle(corner, 3.0, Color(0.35, 0.35, 0.38))
+
+	# Canna del cannone (punta verso il terrain)
+	var barrel_w := 32.0
+	var barrel_h := 14.0
+	var bx := center.x + (6.0 if faces_right else -barrel_w - 6.0)
+	draw_rect(Rect2(bx, center.y - barrel_h * 0.5, barrel_w, barrel_h), Color(0.30, 0.30, 0.35))
+	draw_rect(Rect2(bx, center.y - barrel_h * 0.5, barrel_w, 2), Color(0.40, 0.40, 0.45))
+
+	# Corpo del cannone
+	draw_circle(center, 24.0, Color(0.18, 0.18, 0.21))
+	draw_circle(center, 20.0, Color(0.26, 0.26, 0.30))
+	draw_circle(center, 12.0, Color(0.38, 0.38, 0.43))
+	# Punto colorato = arma attiva
+	draw_circle(center, 7.0, WEAPONS[current_weapon].color)
+	draw_circle(center, 3.5, WEAPONS[current_weapon].color.lightened(0.5))
+
+# ── Overlay draw: proiettili, vermi, VFX ─────────────────────────────────────
+
+func _draw_overlay() -> void:
+	_draw_vfx_overlay()
+	_draw_projectiles_overlay()
+	_draw_worms_overlay()
+
+func _draw_projectiles_overlay() -> void:
+	for proj in _projectiles:
+		var w   := WEAPONS[proj.weapon]
+		var pos := _proj_pos(proj)
+		# Scia
+		for i in 6:
+			var tt := proj.t - float(i + 1) * 0.025
+			if tt < 0.0:
+				continue
+			var tp := _proj_pos_at(proj, tt)
+			var a  := maxf(0.0, 0.28 - i * 0.04)
+			draw_circle(tp, w.proj_r * (0.6 - i * 0.08), Color(w.color.r, w.color.g, w.color.b, a))
+		# Proiettile
+		draw_circle(pos, w.proj_r, w.color)
+		draw_circle(pos, w.proj_r * 0.45, w.color.lightened(0.5))
+
+func _draw_worms_overlay() -> void:
+	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.012)
+	for worm in _worms:
+		var lp := _cell_to_local(worm.col, worm.row)
+		draw_circle(lp, 8.0 + pulse * 3.0, Color(0.9, 0.5, 0.1, 0.35))
+		draw_circle(lp, 6.0, Color(1.0, 0.72, 0.2))
+		draw_circle(lp, 3.0, Color(1.0, 1.0, 0.6))
+
+func _draw_vfx_overlay() -> void:
+	for fx in _vfx:
+		var progress: float = fx.t / fx.dur
+		var alpha: float    = (1.0 - progress) * 0.6
+		draw_circle(fx.pos, fx.r,         Color(fx.color.r, fx.color.g, fx.color.b, alpha * 0.5))
+		draw_circle(fx.pos, fx.r * 0.55,  Color(1.0, 0.95, 0.7, alpha))
 
 # ── Process ───────────────────────────────────────────────────────────────────
 
 func _process(delta: float) -> void:
-	var dirty := false
+	var terrain_dirty := false
+	var need_overlay  := false
 
-	# Lanciafiamme: danno continuo nella posizione del mouse
+	# Proiettili in volo
+	for proj in _projectiles:
+		proj.t = minf(proj.t + proj.speed * delta, 1.0)
+		if proj.t >= 1.0 and not proj.get("done", false):
+			proj["done"] = true
+			_on_impact(proj)
+			terrain_dirty = true
+		need_overlay = true
+
+	_projectiles = _projectiles.filter(func(p): return not p.get("done", false))
+
+	# Lanciafiamme: raffica rapida
 	if _flame_on:
-		var local := get_viewport().get_mouse_position() - position
-		_circle_dmg(local, WEAPONS[Weapon.FLAMETHROWER].r,
-					WEAPONS[Weapon.FLAMETHROWER].dmg * delta * 60.0)
-		dirty = true
+		_flame_timer += delta
+		while _flame_timer >= FLAME_INTERVAL:
+			_flame_timer -= FLAME_INTERVAL
+			_launch_flame_shot()
+		need_overlay = true
 
-	# Acido: corrosione + espansione
+	# Vermi
+	for worm in _worms:
+		if worm.steps <= 0:
+			continue
+		worm.timer += delta
+		while worm.timer >= 1.0 / 15.0 and worm.steps > 0:
+			worm.timer -= 1.0 / 15.0
+			_worm_step(worm)
+			terrain_dirty = true
+		need_overlay = true
+
+	_worms = _worms.filter(func(w): return w.steps > 0)
+
+	# Acido
 	if not _acid_cells.is_empty():
 		var to_spread: Dictionary = {}
 		var to_remove: Array      = []
-
 		for idx in _acid_cells.keys():
-			var strength: float = _acid_cells[idx]
-
+			var str: float = _acid_cells[idx]
 			if _hp[idx] > 0.0:
-				_dmg_idx(idx, strength * delta * 22.0)
-				dirty = true
-
-			if randf() < 0.018 * strength:
+				_dmg_idx(idx, str * delta * 22.0)
+				terrain_dirty = true
+			if randf() < 0.018 * str:
 				for n in _neighbors(idx % COLS, idx / COLS):
 					if _hp[n] > 0.0 and not _acid_cells.has(n):
-						to_spread[n] = strength * 0.52
-
+						to_spread[n] = str * 0.52
 			_acid_cells[idx] -= delta * 0.38
 			if _acid_cells[idx] <= 0.0:
 				to_remove.append(idx)
-
 		for idx in to_remove:
 			_acid_cells.erase(idx)
 		for idx in to_spread:
 			_acid_cells[idx] = to_spread[idx]
+		need_overlay = true
 
-	if dirty:
+	# VFX
+	if not _vfx.is_empty():
+		for fx in _vfx:
+			fx.t += delta
+			fx.r  = lerpf(0.0, fx.max_r, fx.t / fx.dur)
+		_vfx = _vfx.filter(func(fx): return fx.t < fx.dur)
+		need_overlay = true
+
+	if terrain_dirty:
 		_tex.update(_img)
+	if need_overlay or not _worms.is_empty():
+		_overlay.queue_redraw()
 
 # ── Input ─────────────────────────────────────────────────────────────────────
 
 func _input(event: InputEvent) -> void:
-	# Tasti 1-5: cambio arma
 	if event is InputEventKey and event.pressed and not event.echo:
 		for w in WEAPONS:
 			if event.keycode == WEAPONS[w].key:
 				current_weapon = w
 				_refresh_label()
+				queue_redraw()
 				return
 
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		var local := event.position - position
-		var in_area := local.x >= 0.0 and local.x < AREA_W \
-					and local.y >= 0.0 and local.y < AREA_H
-
-		if event.pressed and in_area:
-			match current_weapon:
-				Weapon.BULLET:       _fire_bullet(local)
-				Weapon.BOMB:         _fire_bomb(local)
-				Weapon.MISSILE:      _fire_missile(local)
-				Weapon.FLAMETHROWER: _flame_on = true
-				Weapon.ACID:         _fire_acid(local)
+		var in_terrain := (local.x >= GRID_X and local.x < AREA_W - GRID_X
+						   and local.y >= 0.0 and local.y < AREA_H)
+		if event.pressed and in_terrain:
+			if current_weapon == Weapon.FLAMETHROWER:
+				_flame_on    = true
+				_flame_timer = 0.0
+			else:
+				_launch(local, current_weapon)
 		else:
 			_flame_on = false
 
 	if event is InputEventMouseMotion and _flame_on:
 		var local := event.position - position
-		if local.y < 0.0 or local.y >= AREA_H:
+		if local.x < GRID_X or local.x >= AREA_W - GRID_X or local.y < 0.0 or local.y >= AREA_H:
 			_flame_on = false
 
-# ── Armi ─────────────────────────────────────────────────────────────────────
+# ── Lancio proiettili ─────────────────────────────────────────────────────────
 
-func _fire_bullet(pos: Vector2) -> void:
-	var col := int(pos.x / CELL)
-	var row := int(pos.y / CELL)
-	if _in_bounds(col, row):
-		_dmg_idx(row * COLS + col, 9999.0)
-	_tex.update(_img)
+# Il cannone sul lato opposto al bersaglio spara, così l'arco attraversa lo schermo.
+func _pick_launcher(target: Vector2) -> Vector2:
+	return RIGHT_LAUNCHER if target.x < AREA_W * 0.5 else LEFT_LAUNCHER
 
-func _fire_bomb(pos: Vector2) -> void:
-	_circle_dmg(pos, WEAPONS[Weapon.BOMB].r, WEAPONS[Weapon.BOMB].dmg)
-	_tex.update(_img)
+func _launch(target: Vector2, weapon: Weapon) -> void:
+	var launcher := _pick_launcher(target)
+	var dist     := launcher.distance_to(target)
+	_projectiles.append({
+		"start":  launcher,
+		"target": target,
+		"arc_h":  dist * 0.40,
+		"t":      0.0,
+		"speed":  WEAPONS[weapon].speed,
+		"weapon": weapon,
+	})
 
-func _fire_missile(pos: Vector2) -> void:
-	_circle_dmg(pos, WEAPONS[Weapon.MISSILE].r, WEAPONS[Weapon.MISSILE].dmg)
-	_tex.update(_img)
+func _launch_flame_shot() -> void:
+	var mp := get_viewport().get_mouse_position() - position
+	if mp.x < GRID_X or mp.x >= AREA_W - GRID_X or mp.y < 0.0 or mp.y >= AREA_H:
+		_flame_on = false
+		return
+	var spread := Vector2(randf_range(-18.0, 18.0), randf_range(-12.0, 12.0))
+	_launch(mp + spread, Weapon.FLAMETHROWER)
 
-func _fire_acid(pos: Vector2) -> void:
-	var acid_r := WEAPONS[Weapon.ACID].r
-	var cr := int(ceil(acid_r / CELL))
-	var cc := int(pos.x / CELL)
-	var rc := int(pos.y / CELL)
+func _proj_pos(proj: Dictionary) -> Vector2:
+	return _proj_pos_at(proj, proj.t)
+
+func _proj_pos_at(proj: Dictionary, t: float) -> Vector2:
+	return Vector2(
+		lerpf(proj.start.x, proj.target.x, t),
+		lerpf(proj.start.y, proj.target.y, t) - proj.arc_h * sin(PI * t)
+	)
+
+# ── Impatto ───────────────────────────────────────────────────────────────────
+
+func _on_impact(proj: Dictionary) -> void:
+	var pos := proj.target
+	match proj.weapon:
+		Weapon.BULLET:
+			var cell := _local_to_cell(pos)
+			if _in_bounds(cell.x, cell.y):
+				_dmg_idx(cell.y * COLS + cell.x, 9999.0)
+		Weapon.BOMB:
+			_circle_dmg(pos, 42.0, 180.0)
+			_add_vfx(pos, 42.0, Color(1.0, 0.5, 0.1), 0.45)
+		Weapon.MISSILE:
+			_circle_dmg(pos, 85.0, 260.0)
+			_add_vfx(pos, 85.0, Color(1.0, 0.8, 0.3), 0.55)
+		Weapon.FLAMETHROWER:
+			_circle_dmg(pos, 20.0, 40.0)
+		Weapon.ACID:
+			_apply_acid(pos, 14.0)
+		Weapon.WORM:
+			_spawn_worm(pos)
+
+func _add_vfx(pos: Vector2, max_r: float, color: Color, dur: float) -> void:
+	_vfx.append({"pos": pos, "r": 0.0, "max_r": max_r, "dur": dur, "t": 0.0, "color": color})
+
+# ── Azioni armi ───────────────────────────────────────────────────────────────
+
+func _apply_acid(pos: Vector2, radius: float) -> void:
+	var cr := int(ceil(radius / CELL))
+	var cc := _local_to_cell(pos).x
+	var rc := _local_to_cell(pos).y
 	for dy in range(-cr, cr + 1):
 		for dx in range(-cr, cr + 1):
-			var c := cc + dx
-			var r := rc + dy
+			var c := cc + dx; var r := rc + dy
 			if not _in_bounds(c, r):
 				continue
-			var cx := float(c * CELL + CELL / 2)
-			var cy := float(r * CELL + CELL / 2)
-			if Vector2(cx, cy).distance_to(pos) <= acid_r:
+			if _cell_to_local(c, r).distance_to(pos) <= radius:
 				var idx := r * COLS + c
 				_acid_cells[idx] = maxf(_acid_cells.get(idx, 0.0), 2.8)
 
-# ── Utilità danno ─────────────────────────────────────────────────────────────
+func _spawn_worm(pos: Vector2) -> void:
+	var cell := _local_to_cell(pos)
+	if not _in_bounds(cell.x, cell.y):
+		return
+	_worms.append({"col": cell.x, "row": cell.y, "steps": 240, "timer": 0.0})
+
+func _worm_step(worm: Dictionary) -> void:
+	var dirs := [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]
+	dirs.shuffle()
+
+	var best_c := -1
+	var best_r := -1
+	var found_solid := false
+
+	for d in dirs:
+		var nc := worm.col + d[0]
+		var nr := worm.row + d[1]
+		if not _in_bounds(nc, nr):
+			continue
+		if _hp[nr * COLS + nc] > 0.0:
+			best_c = nc; best_r = nr
+			found_solid = true
+			break
+		elif best_c < 0:
+			best_c = nc; best_r = nr
+
+	if best_c < 0:
+		worm.steps = 0
+		return
+
+	worm.col   = best_c
+	worm.row   = best_r
+	worm.steps -= 1
+	_circle_dmg(_cell_to_local(worm.col, worm.row), CELL * 1.6, 9999.0)
+
+# ── Danno ─────────────────────────────────────────────────────────────────────
 
 func _circle_dmg(center: Vector2, radius: float, damage: float) -> void:
 	var cr := int(ceil(radius / CELL))
-	var cc := int(center.x / CELL)
-	var rc := int(center.y / CELL)
+	var cc := _local_to_cell(center).x
+	var rc := _local_to_cell(center).y
 	for dy in range(-cr, cr + 1):
 		for dx in range(-cr, cr + 1):
-			var col := cc + dx
-			var row := rc + dy
-			if not _in_bounds(col, row):
+			var c := cc + dx; var r := rc + dy
+			if not _in_bounds(c, r):
 				continue
-			var cx := float(col * CELL + CELL / 2)
-			var cy := float(row * CELL + CELL / 2)
-			var dist := Vector2(cx, cy).distance_to(center)
+			var dist := _cell_to_local(c, r).distance_to(center)
 			if dist <= radius:
 				var falloff := 1.0 - (dist / radius)
-				_dmg_idx(row * COLS + col, damage * (0.25 + 0.75 * falloff))
+				_dmg_idx(r * COLS + c, damage * (0.25 + 0.75 * falloff))
 
 func _dmg_idx(idx: int, amount: float) -> void:
 	if _hp[idx] <= 0.0:
@@ -294,23 +498,30 @@ func _dmg_idx(idx: int, amount: float) -> void:
 	_hp[idx] = maxf(0.0, _hp[idx] - amount)
 	_draw_cell(idx % COLS, idx / COLS)
 
-func _neighbors(col: int, row: int) -> Array:
-	var res: Array = []
-	for d in [[1, 0], [-1, 0], [0, 1], [0, -1]]:
-		var nc := col + d[0]
-		var nr := row + d[1]
-		if _in_bounds(nc, nr):
-			res.append(nr * COLS + nc)
-	return res
+# ── Coordinate ────────────────────────────────────────────────────────────────
+
+func _local_to_cell(local: Vector2) -> Vector2i:
+	return Vector2i(int((local.x - GRID_X) / CELL), int(local.y / CELL))
+
+func _cell_to_local(col: int, row: int) -> Vector2:
+	return Vector2(GRID_X + col * CELL + CELL * 0.5, row * CELL + CELL * 0.5)
 
 func _in_bounds(col: int, row: int) -> bool:
 	return col >= 0 and col < COLS and row >= 0 and row < ROWS
+
+func _neighbors(col: int, row: int) -> Array:
+	var res: Array = []
+	for d in [[1,0],[-1,0],[0,1],[0,-1]]:
+		var nc := col + d[0]; var nr := row + d[1]
+		if _in_bounds(nc, nr):
+			res.append(nr * COLS + nc)
+	return res
 
 # ── UI ────────────────────────────────────────────────────────────────────────
 
 func _refresh_label() -> void:
 	var w := WEAPONS[current_weapon]
 	_label.text = (
-		"[1] Proiettile  [2] Bomba  [3] Missile  [4] Lanciafiamme  [5] Acido"
+		"[1] Proiettile  [2] Bomba  [3] Missile  [4] Lanciafiamme  [5] Acido  [6] Verme"
 		+ "     ▶  %s — %s" % [w.name, w.desc]
 	)

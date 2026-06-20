@@ -195,16 +195,17 @@ func _draw_connections(node: Node2D) -> void:
 	for upg in GameState.UPGRADES:
 		if not _node_positions.has(upg.id):
 			continue
-		var from := _node_positions[upg.id] + Vector2(CARD_W * 0.5, CARD_H * 0.5)
+		var from: Vector2 = _node_positions[upg.id] + Vector2(CARD_W * 0.5, CARD_H * 0.5)
 		for conn_id: String in upg.connect:
 			if not _node_positions.has(conn_id):
 				continue
 			# Chiave canonica per evitare doppio disegno
-			var pair := (upg.id + "|" + conn_id) if upg.id < conn_id else (conn_id + "|" + upg.id)
+			var uid: String = str(upg.id)
+			var pair: String = (uid + "|" + conn_id) if uid < conn_id else (conn_id + "|" + uid)
 			if drawn.has(pair):
 				continue
 			drawn[pair] = true
-			var to := _node_positions[conn_id] + Vector2(CARD_W * 0.5, CARD_H * 0.5)
+			var to: Vector2 = _node_positions[conn_id] + Vector2(CARD_W * 0.5, CARD_H * 0.5)
 			# Spessore e colore variano se almeno un lato è upgradato
 			var a_owned := GameState.get_upg_level(upg.id) > 0
 			var b_owned := GameState.get_upg_level(conn_id) > 0

@@ -293,10 +293,10 @@ func _draw_overlay() -> void:
 
 func _draw_projectiles_overlay() -> void:
 	for proj in _projectiles:
-		var w   := WEAPONS[proj.weapon]
+		var w: Dictionary = WEAPONS[proj.weapon]
 		var pos := _proj_pos(proj)
 		for i in 6:
-			var tt := proj.t - float(i + 1) * 0.025
+			var tt: float = float(proj.t) - float(i + 1) * 0.025
 			if tt < 0.0:
 				continue
 			var tp := _proj_pos_at(proj, tt)
@@ -468,7 +468,7 @@ func _proj_pos_at(proj: Dictionary, t: float) -> Vector2:
 # ── Impatto ───────────────────────────────────────────────────────────────────
 
 func _on_impact(proj: Dictionary) -> void:
-	var pos    := proj.target
+	var pos: Vector2 = proj.target
 	var dmg_m  := GameState.weapon_damage_mult()
 	var crit   := randf() < GameState.critical_chance()
 	var crit_m := 3.0 if crit else 1.0
@@ -520,7 +520,7 @@ func _worm_step(worm: Dictionary) -> void:
 	dirs.shuffle()
 	var best_c := -1; var best_r := -1; var found_solid := false
 	for d in dirs:
-		var nc := worm.col + d[0]; var nr := worm.row + d[1]
+		var nc: int = int(worm.col) + int(d[0]); var nr: int = int(worm.row) + int(d[1])
 		if not _in_bounds(nc, nr):
 			continue
 		if _hp[nr * COLS + nc] > 0.0:

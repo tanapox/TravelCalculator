@@ -104,10 +104,10 @@ func _compute_multipliers(n: int) -> Array:
 
 func _nearest_mult_key(val: int) -> int:
 	var keys  := MULT_COLORS.keys()
-	var best  := keys[0]
-	var bdiff := abs(val - best)
+	var best: int  = keys[0]
+	var bdiff: int = abs(val - best)
 	for k in keys:
-		var d := abs(val - k)
+		var d: int = abs(val - k)
 		if d < bdiff:
 			best = k; bdiff = d
 	return best

@@ -2,32 +2,34 @@ extends Node2D
 
 const W: int    = 1280
 const H: int    = 720
-const TOP_H: int = H / 3   # 240 px — sezione palline
+const TOP_H: int = H / 3   # 240 px
 
 const SECTION_COLORS: Array = [
-	Color(0.09, 0.06, 0.15),  # alto: indaco scuro
-	Color(0.05, 0.09, 0.06),  # mezzo: foresta scura
-	Color(0.10, 0.05, 0.05),  # basso: cremisi scuro
+	Color(0.09, 0.06, 0.15),
+	Color(0.05, 0.09, 0.06),
+	Color(0.10, 0.05, 0.05),
 ]
 
 const BALL_COLORS: Array = [
-	Color(0.95, 0.28, 0.28),  # rosso
-	Color(0.28, 0.65, 0.95),  # blu
-	Color(0.28, 0.90, 0.42),  # verde
-	Color(0.95, 0.85, 0.18),  # giallo
-	Color(0.95, 0.48, 0.08),  # arancione
-	Color(0.72, 0.28, 0.95),  # viola
-	Color(0.18, 0.88, 0.82),  # ciano
-	Color(0.95, 0.38, 0.72),  # rosa
+	Color(0.95, 0.28, 0.28),
+	Color(0.28, 0.65, 0.95),
+	Color(0.28, 0.90, 0.42),
+	Color(0.95, 0.85, 0.18),
+	Color(0.95, 0.48, 0.08),
+	Color(0.72, 0.28, 0.95),
+	Color(0.18, 0.88, 0.82),
+	Color(0.95, 0.38, 0.72),
 ]
 
-# Valore monetario per ogni colore (stesso ordine di BALL_COLORS)
-const BALL_VALUES: Array = [10, 20, 15, 25, 30, 50, 35, 40]
-
-const BALL_COUNT_MIN: int  = 6
-const BALL_COUNT_MAX: int  = 14
+const BALL_VALUES: Array    = [10, 20, 15, 25, 30, 50, 35, 40]
+const BALL_COUNT_MIN: int   = 6
+const BALL_COUNT_MAX: int   = 14
 const BALL_RADIUS_MIN: float = 14.0
 const BALL_RADIUS_MAX: float = 46.0
+
+var _terrain: DestructibleArea
+var _bucket:  BucketSection
+var _shop:    UpgradeShop
 
 func _ready() -> void:
 	_setup_background()
@@ -36,6 +38,8 @@ func _ready() -> void:
 	_add_boundary_visuals()
 	_add_terrain()
 	_add_bucket_section()
+	_add_upgrade_shop()
+	GameState.level_up.connect(_on_level_up)
 
 # ── Background ────────────────────────────────────────────────────────────────
 
@@ -49,18 +53,15 @@ func _setup_background() -> void:
 		add_child(rect)
 
 # ── Walls ─────────────────────────────────────────────────────────────────────
-# Tetto + pareti laterali estese fino a y=480.
-# La linea invalicabile a y=240 è RIMOSSA: il terrain distruttibile
-# ora funge da pavimento breakable tramite le sue proprie CollisionShape2D.
 
 func _setup_walls() -> void:
 	const T := 24
-	_make_wall(Vector2(W / 2.0, -T / 2.0),       Vector2(W + T * 2, T))          # tetto
-	_make_wall(Vector2(-T / 2.0,   TOP_H),        Vector2(T, TOP_H * 2 + T * 2)) # sinistra (fino a y=480)
-	_make_wall(Vector2(W + T / 2.0, TOP_H),       Vector2(T, TOP_H * 2 + T * 2)) # destra   (fino a y=480)
+	_make_wall(Vector2(W / 2.0, -T / 2.0),       Vector2(W + T * 2, T))
+	_make_wall(Vector2(-T / 2.0,   TOP_H),        Vector2(T, TOP_H * 2 + T * 2))
+	_make_wall(Vector2(W + T / 2.0, TOP_H),       Vector2(T, TOP_H * 2 + T * 2))
 
 func _make_wall(pos: Vector2, size: Vector2) -> void:
-	var body  := StaticBody2D.new()
+	var body   := StaticBody2D.new()
 	body.position = pos
 	var cshape := CollisionShape2D.new()
 	var rect   := RectangleShape2D.new()
@@ -79,16 +80,13 @@ func _spawn_balls() -> void:
 func _create_ball() -> void:
 	var r         := randf_range(BALL_RADIUS_MIN, BALL_RADIUS_MAX)
 	var color_idx := randi() % BALL_COLORS.size()
-	var c: Color   = BALL_COLORS[color_idx]
-	var m_val: int = BALL_VALUES[color_idx]
-
 	var ball := Ball.new()
 	ball.position = Vector2(
 		randf_range(r + 4.0, W - r - 4.0),
 		randf_range(r + 4.0, TOP_H - r - 8.0)
 	)
 	add_child(ball)
-	ball.setup(r, c, m_val)
+	ball.setup(r, BALL_COLORS[color_idx], BALL_VALUES[color_idx])
 
 # ── Boundary visuals ──────────────────────────────────────────────────────────
 
@@ -120,11 +118,27 @@ func _add_boundary_visuals() -> void:
 # ── Terrain + Bucket ──────────────────────────────────────────────────────────
 
 func _add_terrain() -> void:
-	var terrain := DestructibleArea.new()
-	terrain.position = Vector2(0.0, float(TOP_H))
-	add_child(terrain)
+	_terrain = DestructibleArea.new()
+	_terrain.position = Vector2(0.0, float(TOP_H))
+	add_child(_terrain)
 
 func _add_bucket_section() -> void:
-	var bucket := BucketSection.new()
-	bucket.position = Vector2(0.0, float(TOP_H * 2))
-	add_child(bucket)
+	_bucket = BucketSection.new()
+	_bucket.position = Vector2(0.0, float(TOP_H * 2))
+	add_child(_bucket)
+
+# ── Upgrade Shop ──────────────────────────────────────────────────────────────
+
+func _add_upgrade_shop() -> void:
+	_shop = UpgradeShop.new()
+	add_child(_shop)
+
+# ── Level up ──────────────────────────────────────────────────────────────────
+
+func _on_level_up(new_level: int) -> void:
+	# Notify shop (shows "LIVELLO N!" banner)
+	if _shop:
+		_shop._on_level_up(new_level)
+	# Regenerate terrain with new HP multiplier
+	if _terrain:
+		_terrain.reinit()

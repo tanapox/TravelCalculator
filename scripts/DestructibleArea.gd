@@ -72,7 +72,6 @@ var _vfx:         Array = []
 
 var _flame_on:    bool  = false
 var _flame_timer: float = 0.0
-const FLAME_INTERVAL: float = 0.07
 
 var _label: Label
 
@@ -178,12 +177,16 @@ func init_noise(seed_val: int = -1) -> void:
 	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	noise.frequency  = 0.07
 	noise.seed       = seed_val
+	var hp_m := GameState.terrain_hp_mult()
 	for row in ROWS:
 		for col in COLS:
 			var n:     float = (noise.get_noise_2d(col, row) + 1.0) / 2.0
 			var depth: float = float(row) / ROWS
 			var t:     float = clampf(n * 0.45 + depth * 0.65, 0.0, 1.0)
 			_set_mat(col, row, int(t * PALETTE.size()))
+			var idx := row * COLS + col
+			_hp[idx]     = _max_hp[idx] * hp_m
+			_max_hp[idx] = _hp[idx]
 	if _img:
 		_redraw_all(); _tex.update(_img); _rebuild_all_rows()
 
@@ -218,6 +221,13 @@ func set_cell(col: int, row: int, palette_idx: int) -> void:
 
 func flush_manual() -> void:
 	_redraw_all(); _tex.update(_img); _rebuild_all_rows()
+
+func reinit() -> void:
+	_worms.clear()
+	_projectiles.clear()
+	_acid_cells.clear()
+	_vfx.clear()
+	init_noise()
 
 func _set_mat(col: int, row: int, pal: int) -> void:
 	pal = clampi(pal, 0, PALETTE.size() - 1)
@@ -323,8 +333,9 @@ func _process(delta: float) -> void:
 
 	if _flame_on:
 		_flame_timer += delta
-		while _flame_timer >= FLAME_INTERVAL:
-			_flame_timer -= FLAME_INTERVAL
+		var fi := GameState.flame_interval()
+		while _flame_timer >= fi:
+			_flame_timer -= fi
 			_launch_flame_shot()
 		need_overlay = true
 
@@ -409,16 +420,22 @@ func _input(event: InputEvent) -> void:
 # ── Lancio ────────────────────────────────────────────────────────────────────
 
 func _pick_launcher(target: Vector2) -> Vector2:
+	var positions := GameState.launcher_positions()
+	# launcher_positions() uses y values that are local to this node (0-240 range)
+	var pool: Array = positions.right if target.x < AREA_W * 0.5 else positions.left
+	if pool.size() > 0:
+		return pool[randi() % pool.size()]
 	return RIGHT_LAUNCHER if target.x < AREA_W * 0.5 else LEFT_LAUNCHER
 
 func _launch(target: Vector2, weapon: Weapon) -> void:
 	var launcher := _pick_launcher(target)
+	var spd      := WEAPONS[weapon].speed * GameState.projectile_speed_mult()
 	_projectiles.append({
 		"start":  launcher,
 		"target": target,
 		"arc_h":  launcher.distance_to(target) * 0.40,
 		"t":      0.0,
-		"speed":  WEAPONS[weapon].speed,
+		"speed":  spd,
 		"weapon": weapon,
 	})
 
@@ -440,20 +457,23 @@ func _proj_pos_at(proj: Dictionary, t: float) -> Vector2:
 # ── Impatto ───────────────────────────────────────────────────────────────────
 
 func _on_impact(proj: Dictionary) -> void:
-	var pos := proj.target
+	var pos    := proj.target
+	var dmg_m  := GameState.weapon_damage_mult()
+	var crit   := randf() < GameState.critical_chance()
+	var crit_m := 3.0 if crit else 1.0
 	match proj.weapon:
 		Weapon.BULLET:
 			var cell := _local_to_cell(pos)
 			if _in_bounds(cell.x, cell.y):
 				_dmg_idx(cell.y * COLS + cell.x, 9999.0)
 		Weapon.BOMB:
-			_circle_dmg(pos, 42.0, 180.0)
+			_circle_dmg(pos, 42.0, 180.0 * dmg_m * crit_m)
 			_add_vfx(pos, 42.0, Color(1.0, 0.5, 0.1), 0.45)
 		Weapon.MISSILE:
-			_circle_dmg(pos, 85.0, 260.0)
+			_circle_dmg(pos, 85.0, 260.0 * dmg_m * crit_m)
 			_add_vfx(pos, 85.0, Color(1.0, 0.8, 0.3), 0.55)
 		Weapon.FLAMETHROWER:
-			_circle_dmg(pos, 20.0, 40.0)
+			_circle_dmg(pos, 20.0, 40.0 * dmg_m * crit_m)
 		Weapon.ACID:
 			_apply_acid(pos, 14.0)
 		Weapon.WORM:
@@ -479,7 +499,10 @@ func _apply_acid(pos: Vector2, radius: float) -> void:
 func _spawn_worm(pos: Vector2) -> void:
 	var cell := _local_to_cell(pos)
 	if _in_bounds(cell.x, cell.y):
-		_worms.append({"col": cell.x, "row": cell.y, "steps": 240, "timer": 0.0})
+		_worms.append({"col": cell.x, "row": cell.y,
+			"steps": GameState.worm_steps(),
+			"radius": GameState.worm_eat_radius(),
+			"timer": 0.0})
 
 func _worm_step(worm: Dictionary) -> void:
 	var dirs := [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]
@@ -496,7 +519,8 @@ func _worm_step(worm: Dictionary) -> void:
 	if best_c < 0:
 		worm.steps = 0; return
 	worm.col = best_c; worm.row = best_r; worm.steps -= 1
-	_circle_dmg(_cell_to_local(worm.col, worm.row), CELL * 1.6, 9999.0)
+	var wr: float = worm.get("radius", 1.6)
+	_circle_dmg(_cell_to_local(worm.col, worm.row), CELL * wr, 9999.0)
 
 # ── Danno ─────────────────────────────────────────────────────────────────────
 

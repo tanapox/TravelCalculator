@@ -205,25 +205,28 @@ func set_active_rows(n: int) -> void:
 func init_noise(seed_val: int = -1) -> void:
 	if seed_val < 0:
 		seed_val = randi()
+
+	# Azzera tutto prima — solo le righe attive verranno riempite
+	for i in _hp.size():
+		_hp[i]     = 0.0
+		_max_hp[i] = 0.0
+
 	var noise := FastNoiseLite.new()
 	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	noise.frequency  = 0.035
 	noise.seed       = seed_val
 	var hp_m := GameState.terrain_hp_mult()
-	for row: int in ROWS:
+
+	for row in _active_rows:          # itera solo 0 .. _active_rows-1
 		for col: int in COLS:
 			var idx := row * COLS + col
-			if row >= _active_rows:
-				_base_col[idx] = Color(0.0, 0.0, 0.0, 0.0)
-				_max_hp[idx]   = 0.0
-				_hp[idx]       = 0.0
-				continue
 			var n:     float = (noise.get_noise_2d(col, row) + 1.0) / 2.0
 			var depth: float = float(row) / ROWS
 			var t:     float = clampf(n * 0.45 + depth * 0.65, 0.0, 1.0)
 			_set_mat(col, row, int(t * PALETTE.size()))
 			_hp[idx]     = _max_hp[idx] * hp_m
 			_max_hp[idx] = _hp[idx]
+
 	if _img:
 		_redraw_all(); _tex.update(_img); _rebuild_all_rows()
 

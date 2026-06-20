@@ -315,7 +315,7 @@ func _draw_worms_overlay() -> void:
 
 func _draw_vfx_overlay() -> void:
 	for fx in _vfx:
-		var alpha := (1.0 - fx.t / fx.dur) * 0.6
+		var alpha: float = (1.0 - float(fx.t) / float(fx.dur)) * 0.6
 		draw_circle(fx.pos, fx.r,        Color(fx.color.r, fx.color.g, fx.color.b, alpha * 0.5))
 		draw_circle(fx.pos, fx.r * 0.55, Color(1.0, 0.95, 0.7, alpha))
 

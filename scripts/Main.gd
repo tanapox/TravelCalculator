@@ -1,258 +1,118 @@
-extends Control
+extends Node2D
 
-# Left panel refs
-var cookie_count_label: Label
-var cps_label: Label
-var cpc_label: Label
-var cookie_button: Button
-var total_label: Label
+const W: int = 1280
+const H: int = 720
+const TOP_H: int = H / 3  # 240 px — la sezione in alto
 
-# Right panel refs
-var buildings_list: VBoxContainer
-var upgrades_list: VBoxContainer
+const SECTION_COLORS: Array = [
+	Color(0.09, 0.06, 0.15),  # alto: indaco scuro
+	Color(0.05, 0.09, 0.06),  # mezzo: foresta scura
+	Color(0.10, 0.05, 0.05),  # basso: cremisi scuro
+]
 
-var building_buttons: Dictionary = {}
-var upgrade_buttons: Dictionary = {}
+const BALL_COLORS: Array = [
+	Color(0.95, 0.28, 0.28),  # rosso
+	Color(0.28, 0.65, 0.95),  # blu
+	Color(0.28, 0.90, 0.42),  # verde
+	Color(0.95, 0.85, 0.18),  # giallo
+	Color(0.95, 0.48, 0.08),  # arancione
+	Color(0.72, 0.28, 0.95),  # viola
+	Color(0.18, 0.88, 0.82),  # ciano
+	Color(0.95, 0.38, 0.72),  # rosa
+]
+
+const BALL_COUNT_MIN: int = 6
+const BALL_COUNT_MAX: int = 14
+const BALL_RADIUS_MIN: float = 14.0
+const BALL_RADIUS_MAX: float = 46.0
 
 func _ready() -> void:
-	_build_ui()
-	_connect_signals()
+	_setup_background()
+	_setup_walls()
+	_spawn_balls()
+	_add_boundary_visuals()
 
-	if SaveManager.load_game():
-		_refresh_all()
-	else:
-		_refresh_all()
+# ── Background ────────────────────────────────────────────────────────────────
 
-func _build_ui() -> void:
-	anchor_right = 1.0
-	anchor_bottom = 1.0
+func _setup_background() -> void:
+	for i in 3:
+		var rect := ColorRect.new()
+		rect.position = Vector2(0.0, i * TOP_H)
+		rect.size = Vector2(W, TOP_H)
+		rect.color = SECTION_COLORS[i]
+		rect.z_index = -10
+		add_child(rect)
 
-	# Background
-	var bg = ColorRect.new()
-	bg.color = Color(0.12, 0.08, 0.05)
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
+# ── Walls ─────────────────────────────────────────────────────────────────────
+# Quattro muri chiudono la sezione superiore:
+#   tetto, parete sinistra, parete destra, linea invalicabile in basso.
 
-	# Main HBox
-	var hbox = HBoxContainer.new()
-	hbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	hbox.add_theme_constant_override("separation", 0)
-	add_child(hbox)
+func _setup_walls() -> void:
+	const T := 24  # spessore muri
+	_make_wall(Vector2(W / 2.0,        -T / 2.0),          Vector2(W + T * 2, T))      # tetto
+	_make_wall(Vector2(-T / 2.0,        TOP_H / 2.0),      Vector2(T, TOP_H + T))      # sinistra
+	_make_wall(Vector2(W + T / 2.0,     TOP_H / 2.0),      Vector2(T, TOP_H + T))      # destra
+	_make_wall(Vector2(W / 2.0,         TOP_H + T / 2.0),  Vector2(W + T * 2, T))      # linea invalicabile
 
-	# --- Left Panel ---
-	var left_panel = _make_panel(Color(0.18, 0.11, 0.06), 420)
-	hbox.add_child(left_panel)
+func _make_wall(pos: Vector2, size: Vector2) -> void:
+	var body := StaticBody2D.new()
+	body.position = pos
 
-	var left_vbox = VBoxContainer.new()
-	left_vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	left_vbox.add_theme_constant_override("separation", 16)
-	left_panel.add_child(left_vbox)
+	var cshape := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = size
+	cshape.shape = rect
+	body.add_child(cshape)
 
-	# Title
-	var title = _make_label("Incremental Biscotti", 28, true)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_color_override("font_color", Color(1.0, 0.85, 0.4))
-	left_vbox.add_child(title)
+	add_child(body)
 
-	# Cookie count
-	cookie_count_label = _make_label("0 biscotti", 36, true)
-	cookie_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	cookie_count_label.add_theme_color_override("font_color", Color(1.0, 0.95, 0.6))
-	left_vbox.add_child(cookie_count_label)
+# ── Balls ─────────────────────────────────────────────────────────────────────
 
-	# CPS
-	cps_label = _make_label("Per secondo: 0", 18)
-	cps_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	cps_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
-	left_vbox.add_child(cps_label)
+func _spawn_balls() -> void:
+	var count := randi_range(BALL_COUNT_MIN, BALL_COUNT_MAX)
+	for _i in count:
+		_create_ball()
 
-	# CPC
-	cpc_label = _make_label("Per click: 1", 16)
-	cpc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	cpc_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
-	left_vbox.add_child(cpc_label)
+func _create_ball() -> void:
+	var r := randf_range(BALL_RADIUS_MIN, BALL_RADIUS_MAX)
+	var c: Color = BALL_COLORS[randi() % BALL_COLORS.size()]
 
-	# Cookie Button
-	cookie_button = Button.new()
-	cookie_button.text = "🍪"
-	cookie_button.custom_minimum_size = Vector2(180, 180)
-	cookie_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	cookie_button.add_theme_font_size_override("font_size", 80)
-	left_vbox.add_child(cookie_button)
+	var ball := Ball.new()
+	ball.position = Vector2(
+		randf_range(r + 4.0, W - r - 4.0),
+		randf_range(r + 4.0, TOP_H - r - 8.0)
+	)
 
-	# Total cookies
-	total_label = _make_label("Totale: 0", 14)
-	total_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	total_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
-	left_vbox.add_child(total_label)
+	add_child(ball)
+	ball.setup(r, c)
 
-	# Save / Reset buttons row
-	var save_row = HBoxContainer.new()
-	save_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	save_row.add_theme_constant_override("separation", 8)
-	left_vbox.add_child(save_row)
+# ── Boundary visuals ──────────────────────────────────────────────────────────
+# La linea invalicabile è visibile con un bagliore azzurro.
 
-	var save_btn = Button.new()
-	save_btn.text = "Salva"
-	save_btn.pressed.connect(func(): SaveManager.save_game())
-	save_row.add_child(save_btn)
+func _add_boundary_visuals() -> void:
+	# Alone (glow)
+	var glow := Line2D.new()
+	glow.add_point(Vector2(0.0, TOP_H))
+	glow.add_point(Vector2(W, TOP_H))
+	glow.width = 14.0
+	glow.default_color = Color(0.40, 0.75, 1.0, 0.22)
+	glow.z_index = 50
+	add_child(glow)
 
-	var reset_btn = Button.new()
-	reset_btn.text = "Reset"
-	reset_btn.pressed.connect(_on_reset_pressed)
-	save_row.add_child(reset_btn)
+	# Linea principale
+	var line := Line2D.new()
+	line.add_point(Vector2(0.0, TOP_H))
+	line.add_point(Vector2(W, TOP_H))
+	line.width = 3.0
+	line.default_color = Color(0.65, 0.90, 1.0, 0.95)
+	line.z_index = 51
+	add_child(line)
 
-	# --- Right Panel ---
-	var right_panel = _make_panel(Color(0.10, 0.07, 0.04))
-	right_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hbox.add_child(right_panel)
-
-	var scroll = ScrollContainer.new()
-	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	right_panel.add_child(scroll)
-
-	var right_vbox = VBoxContainer.new()
-	right_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	right_vbox.add_theme_constant_override("separation", 8)
-	scroll.add_child(right_vbox)
-
-	# Upgrades section
-	var up_title = _make_label("Potenziamenti", 20, true)
-	up_title.add_theme_color_override("font_color", Color(0.5, 1.0, 0.6))
-	right_vbox.add_child(up_title)
-
-	upgrades_list = VBoxContainer.new()
-	upgrades_list.add_theme_constant_override("separation", 4)
-	right_vbox.add_child(upgrades_list)
-
-	var separator = HSeparator.new()
-	right_vbox.add_child(separator)
-
-	# Buildings section
-	var build_title = _make_label("Edifici", 20, true)
-	build_title.add_theme_color_override("font_color", Color(0.5, 0.8, 1.0))
-	right_vbox.add_child(build_title)
-
-	buildings_list = VBoxContainer.new()
-	buildings_list.add_theme_constant_override("separation", 4)
-	right_vbox.add_child(buildings_list)
-
-	_create_building_buttons()
-	_create_upgrade_buttons()
-
-func _make_panel(color: Color, min_width: int = 0) -> PanelContainer:
-	var panel = PanelContainer.new()
-	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	if min_width > 0:
-		panel.custom_minimum_size.x = min_width
-	var style = StyleBoxFlat.new()
-	style.bg_color = color
-	style.set_content_margin_all(16)
-	panel.add_theme_stylebox_override("panel", style)
-	return panel
-
-func _make_label(text: String, size: int = 16, bold: bool = false) -> Label:
-	var lbl = Label.new()
-	lbl.text = text
-	lbl.add_theme_font_size_override("font_size", size)
-	return lbl
-
-func _create_building_buttons() -> void:
-	for id in GameManager.building_order:
-		var b = GameManager.buildings[id]
-		var btn = _make_shop_btn()
-		btn.pressed.connect(func(): _on_buy_building(id))
-		buildings_list.add_child(btn)
-		building_buttons[id] = btn
-	_refresh_building_buttons()
-
-func _create_upgrade_buttons() -> void:
-	for id in GameManager.upgrades:
-		var btn = _make_shop_btn()
-		btn.pressed.connect(func(): _on_buy_upgrade(id))
-		btn.visible = false
-		upgrades_list.add_child(btn)
-		upgrade_buttons[id] = btn
-	_refresh_upgrade_buttons()
-
-func _make_shop_btn() -> Button:
-	var btn = Button.new()
-	btn.custom_minimum_size = Vector2(0, 64)
-	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	return btn
-
-func _connect_signals() -> void:
-	GameManager.cookies_changed.connect(_on_cookies_changed)
-	GameManager.cps_changed.connect(_on_cps_changed)
-	GameManager.building_bought.connect(func(_id): _refresh_building_buttons())
-	GameManager.upgrade_bought.connect(func(_id): _refresh_upgrade_buttons())
-	GameManager.upgrade_unlocked.connect(_on_upgrade_unlocked)
-	cookie_button.pressed.connect(GameManager.click)
-
-func _on_cookies_changed(_amount: float) -> void:
-	cookie_count_label.text = GameManager.format_number(GameManager.cookies) + " biscotti"
-	total_label.text = "Totale guadagnati: " + GameManager.format_number(GameManager.total_cookies)
-	_refresh_building_buttons()
-	_refresh_upgrade_buttons()
-
-func _on_cps_changed(_amount: float) -> void:
-	cps_label.text = "Per secondo: " + GameManager.format_number(GameManager.cookies_per_second)
-
-func _on_upgrade_unlocked(id: String) -> void:
-	if upgrade_buttons.has(id):
-		upgrade_buttons[id].visible = true
-
-func _refresh_building_buttons() -> void:
-	for id in building_buttons:
-		var b = GameManager.buildings[id]
-		var btn: Button = building_buttons[id]
-		var affordable = GameManager.can_afford(b.cost)
-		btn.disabled = not affordable
-		btn.text = " %s  [x%d]\n  Costo: %s  |  +%s/s" % [
-			b.name,
-			b.count,
-			GameManager.format_number(b.cost),
-			GameManager.format_number(b.base_cps * b.cps_multiplier)
-		]
-
-func _refresh_upgrade_buttons() -> void:
-	for id in upgrade_buttons:
-		var u = GameManager.upgrades[id]
-		var btn: Button = upgrade_buttons[id]
-		if u.bought:
-			btn.visible = false
-			continue
-		if not GameManager.is_upgrade_unlocked(id):
-			continue
-		btn.disabled = not GameManager.can_afford(u.cost)
-		btn.text = " %s\n  %s  |  Costo: %s" % [
-			u.name,
-			u.description,
-			GameManager.format_number(u.cost)
-		]
-
-func _refresh_all() -> void:
-	cookie_count_label.text = GameManager.format_number(GameManager.cookies) + " biscotti"
-	total_label.text = "Totale guadagnati: " + GameManager.format_number(GameManager.total_cookies)
-	cps_label.text = "Per secondo: " + GameManager.format_number(GameManager.cookies_per_second)
-	cpc_label.text = "Per click: " + GameManager.format_number(GameManager.cookies_per_click)
-	_refresh_building_buttons()
-	_refresh_upgrade_buttons()
-
-	# Re-show already-unlocked upgrades after load
-	for id in GameManager.upgrades:
-		if not GameManager.upgrades[id].bought and GameManager.is_upgrade_unlocked(id):
-			if upgrade_buttons.has(id):
-				upgrade_buttons[id].visible = true
-
-func _on_buy_building(id: String) -> void:
-	GameManager.buy_building(id)
-
-func _on_buy_upgrade(id: String) -> void:
-	if GameManager.buy_upgrade(id):
-		cpc_label.text = "Per click: " + GameManager.format_number(GameManager.cookies_per_click)
-
-func _on_reset_pressed() -> void:
-	SaveManager.delete_save()
-	get_tree().reload_current_scene()
+	# Separatore tra sezione media e bassa (sottile, decorativo)
+	var divider := Line2D.new()
+	divider.add_point(Vector2(0.0, TOP_H * 2))
+	divider.add_point(Vector2(W, TOP_H * 2))
+	divider.width = 2.0
+	divider.default_color = Color(0.50, 0.50, 0.55, 0.35)
+	divider.z_index = 50
+	add_child(divider)

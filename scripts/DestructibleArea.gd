@@ -44,8 +44,31 @@ const WEAPONS: Dictionary = {
 class OverlayNode extends Node2D:
 	var area: DestructibleArea
 	func _draw() -> void:
-		if area:
-			area._draw_overlay()
+		if not area:
+			return
+		for fx in area._vfx:
+			var alpha: float = (1.0 - float(fx.t) / float(fx.dur)) * 0.6
+			draw_circle(fx.pos, float(fx.r),        Color(fx.color.r, fx.color.g, fx.color.b, alpha * 0.5))
+			draw_circle(fx.pos, float(fx.r) * 0.55, Color(1.0, 0.95, 0.7, alpha))
+		for proj in area._projectiles:
+			var w: Dictionary = area.WEAPONS[proj.weapon]
+			var pos: Vector2  = area._proj_pos(proj)
+			for i in 6:
+				var tt: float = float(proj.t) - float(i + 1) * 0.025
+				if tt < 0.0:
+					continue
+				var tp: Vector2 = area._proj_pos_at(proj, tt)
+				var a: float    = maxf(0.0, 0.28 - float(i) * 0.04)
+				draw_circle(tp, float(w.proj_r) * (0.6 - float(i) * 0.08),
+							Color(w.color.r, w.color.g, w.color.b, a))
+			draw_circle(pos, float(w.proj_r), w.color)
+			draw_circle(pos, float(w.proj_r) * 0.45, (w.color as Color).lightened(0.5))
+		var pulse: float = 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.012)
+		for worm in area._worms:
+			var lp: Vector2 = area._cell_to_local(int(worm.col), int(worm.row))
+			draw_circle(lp, 8.0 + pulse * 3.0, Color(0.9, 0.5, 0.1, 0.35))
+			draw_circle(lp, 6.0, Color(1.0, 0.72, 0.2))
+			draw_circle(lp, 3.0, Color(1.0, 1.0, 0.6))
 
 # ── Stato ─────────────────────────────────────────────────────────────────────
 
@@ -284,40 +307,6 @@ func _draw_launcher_panel(center: Vector2, rect: Rect2, faces_right: bool) -> vo
 	draw_circle(center, 7.0,  WEAPONS[current_weapon].color)
 	draw_circle(center, 3.5,  WEAPONS[current_weapon].color.lightened(0.5))
 
-# ── Overlay draw ──────────────────────────────────────────────────────────────
-
-func _draw_overlay() -> void:
-	_draw_vfx_overlay()
-	_draw_projectiles_overlay()
-	_draw_worms_overlay()
-
-func _draw_projectiles_overlay() -> void:
-	for proj in _projectiles:
-		var w: Dictionary = WEAPONS[proj.weapon]
-		var pos := _proj_pos(proj)
-		for i in 6:
-			var tt: float = float(proj.t) - float(i + 1) * 0.025
-			if tt < 0.0:
-				continue
-			var tp := _proj_pos_at(proj, tt)
-			var a  := maxf(0.0, 0.28 - i * 0.04)
-			draw_circle(tp, w.proj_r * (0.6 - i * 0.08), Color(w.color.r, w.color.g, w.color.b, a))
-		draw_circle(pos, w.proj_r, w.color)
-		draw_circle(pos, w.proj_r * 0.45, w.color.lightened(0.5))
-
-func _draw_worms_overlay() -> void:
-	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.012)
-	for worm in _worms:
-		var lp := _cell_to_local(worm.col, worm.row)
-		draw_circle(lp, 8.0 + pulse * 3.0, Color(0.9, 0.5, 0.1, 0.35))
-		draw_circle(lp, 6.0, Color(1.0, 0.72, 0.2))
-		draw_circle(lp, 3.0, Color(1.0, 1.0, 0.6))
-
-func _draw_vfx_overlay() -> void:
-	for fx in _vfx:
-		var alpha: float = (1.0 - float(fx.t) / float(fx.dur)) * 0.6
-		draw_circle(fx.pos, fx.r,        Color(fx.color.r, fx.color.g, fx.color.b, alpha * 0.5))
-		draw_circle(fx.pos, fx.r * 0.55, Color(1.0, 0.95, 0.7, alpha))
 
 # ── Process ───────────────────────────────────────────────────────────────────
 
@@ -468,7 +457,7 @@ func _launch_from_panel(panel_y: float, from_right: bool, weapon: Weapon) -> voi
 	_projectiles.append({
 		"start":  launcher,
 		"target": target,
-		"arc_h":  8.0,
+		"arc_h":  35.0,
 		"t":      0.0,
 		"speed":  spd,
 		"weapon": weapon,
@@ -503,6 +492,7 @@ func _on_impact(proj: Dictionary) -> void:
 			var cell := _local_to_cell(pos)
 			if _in_bounds(cell.x, cell.y):
 				_dmg_idx(cell.y * COLS + cell.x, 9999.0)
+				_add_vfx(pos, 20.0, Color(1.0, 0.95, 0.35), 0.22)
 		Weapon.BOMB:
 			_circle_dmg(pos, 42.0, 180.0 * dmg_m * crit_m)
 			_add_vfx(pos, 42.0, Color(1.0, 0.5, 0.1), 0.45)

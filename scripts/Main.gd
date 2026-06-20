@@ -300,7 +300,9 @@ func _on_level_up(new_level: int) -> void:
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_F11:
+		if event.keycode == KEY_ESCAPE:
+			get_tree().quit()
+		elif event.keycode == KEY_F11:
 			var win := get_window()
 			win.mode = Window.MODE_WINDOWED if win.mode == Window.MODE_FULLSCREEN \
 					   else Window.MODE_FULLSCREEN

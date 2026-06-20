@@ -181,8 +181,8 @@ func init_noise(seed_val: int = -1) -> void:
 	noise.frequency  = 0.07
 	noise.seed       = seed_val
 	var hp_m := GameState.terrain_hp_mult()
-	for row in ROWS:
-		for col in COLS:
+	for row: int in ROWS:
+		for col: int in COLS:
 			var n:     float = (noise.get_noise_2d(col, row) + 1.0) / 2.0
 			var depth: float = float(row) / ROWS
 			var t:     float = clampf(n * 0.45 + depth * 0.65, 0.0, 1.0)
@@ -194,21 +194,21 @@ func init_noise(seed_val: int = -1) -> void:
 		_redraw_all(); _tex.update(_img); _rebuild_all_rows()
 
 func init_random() -> void:
-	for row in ROWS:
-		for col in COLS:
+	for row: int in ROWS:
+		for col: int in COLS:
 			_set_mat(col, row, randi() % PALETTE.size())
 	if _img:
 		_redraw_all(); _tex.update(_img); _rebuild_all_rows()
 
 func init_from_image(path: String) -> bool:
-	var src := Image.load_from_file(path)
+	var src: Image = Image.load_from_file(path)
 	if not src:
 		push_warning("DestructibleArea: file non trovato → " + path)
 		return false
 	src.resize(COLS, ROWS, Image.INTERPOLATE_NEAREST)
-	for row in ROWS:
-		for col in COLS:
-			var px  := src.get_pixel(col, row)
+	for row: int in ROWS:
+		for col: int in COLS:
+			var px: Color = src.get_pixel(col, row)
 			var idx := row * COLS + col
 			_base_col[idx] = px
 			var hp: float  = lerpf(230.0, 10.0, px.get_luminance())
@@ -242,13 +242,13 @@ func _set_mat(col: int, row: int, pal: int) -> void:
 # ── Rendering terrain ─────────────────────────────────────────────────────────
 
 func _redraw_all() -> void:
-	for row in ROWS:
-		for col in COLS:
+	for row: int in ROWS:
+		for col: int in COLS:
 			_draw_cell(col, row)
 
 func _draw_cell(col: int, row: int) -> void:
 	var idx  := row * COLS + col
-	var hp   := _hp[idx]
+	var hp: float = _hp[idx]
 	var rect := Rect2i(col * CELL, row * CELL, CELL, CELL)
 	if hp <= 0.0:
 		_img.fill_rect(rect, Color(0, 0, 0, 0))

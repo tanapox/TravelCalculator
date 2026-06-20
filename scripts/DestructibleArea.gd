@@ -405,23 +405,28 @@ func _input(event: InputEvent) -> void:
 
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		var local: Vector2 = (event as InputEventMouse).position - position
-		var in_terrain := (local.x >= GRID_X and local.x < AREA_W - GRID_X
-						   and local.y >= 0.0 and local.y < AREA_H)
-		if event.pressed and in_terrain:
+		var in_left_panel  := local.y >= 0.0 and local.y < float(AREA_H) \
+		                      and local.x >= 0.0 and local.x < float(LAUNCHER_W)
+		var in_right_panel := local.y >= 0.0 and local.y < float(AREA_H) \
+		                      and local.x >= float(AREA_W - LAUNCHER_W) and local.x < float(AREA_W)
+		if event.pressed and (in_left_panel or in_right_panel):
 			if shots_available <= 0:
-				return   # nessuna arma disponibile questo round
+				return
 			shots_available -= 1
 			weapon_fired.emit()
 			if current_weapon == Weapon.FLAMETHROWER:
 				_flame_on = true; _flame_timer = 0.0
 			else:
-				_launch(local, current_weapon)
-		else:
+				_launch_from_panel(local.y, in_right_panel, current_weapon)
+		if not event.pressed:
 			_flame_on = false
 
 	if event is InputEventMouseMotion and _flame_on:
 		var local: Vector2 = (event as InputEventMouse).position - position
-		if local.x < GRID_X or local.x >= AREA_W - GRID_X or local.y < 0.0 or local.y >= AREA_H:
+		var still_in_panel := (local.y >= 0.0 and local.y < float(AREA_H)) and \
+		                      ((local.x >= 0.0 and local.x < float(LAUNCHER_W)) or \
+		                       (local.x >= float(AREA_W - LAUNCHER_W) and local.x < float(AREA_W)))
+		if not still_in_panel:
 			_flame_on = false
 
 func stop_firing() -> void:
@@ -450,11 +455,32 @@ func _launch(target: Vector2, weapon: Weapon) -> void:
 		"weapon": weapon,
 	})
 
+func _launch_from_panel(panel_y: float, from_right: bool, weapon: Weapon) -> void:
+	var launcher: Vector2
+	var target: Vector2
+	if from_right:
+		launcher = Vector2(float(AREA_W) - float(LAUNCHER_W) * 0.5, panel_y)
+		target   = Vector2(float(GRID_X) + float(COLS * CELL) * 0.3, panel_y)
+	else:
+		launcher = Vector2(float(LAUNCHER_W) * 0.5, panel_y)
+		target   = Vector2(float(GRID_X) + float(COLS * CELL) * 0.7, panel_y)
+	var spd: float = float(WEAPONS[weapon].speed) * GameState.projectile_speed_mult()
+	_projectiles.append({
+		"start":  launcher,
+		"target": target,
+		"arc_h":  8.0,
+		"t":      0.0,
+		"speed":  spd,
+		"weapon": weapon,
+	})
+
 func _launch_flame_shot() -> void:
-	var mp := get_viewport().get_mouse_position() - position
-	if mp.x < GRID_X or mp.x >= AREA_W - GRID_X or mp.y < 0.0 or mp.y >= AREA_H:
+	var mp: Vector2 = get_viewport().get_mouse_position() - position
+	var in_left  := mp.y >= 0.0 and mp.y < float(AREA_H) and mp.x >= 0.0 and mp.x < float(LAUNCHER_W)
+	var in_right := mp.y >= 0.0 and mp.y < float(AREA_H) and mp.x >= float(AREA_W - LAUNCHER_W) and mp.x < float(AREA_W)
+	if not (in_left or in_right):
 		_flame_on = false; return
-	_launch(mp + Vector2(randf_range(-18.0, 18.0), randf_range(-12.0, 12.0)), Weapon.FLAMETHROWER)
+	_launch_from_panel(mp.y + randf_range(-12.0, 12.0), in_right, Weapon.FLAMETHROWER)
 
 func _proj_pos(proj: Dictionary) -> Vector2:
 	return _proj_pos_at(proj, proj.t)

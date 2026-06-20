@@ -165,7 +165,7 @@ func flame_interval() -> float:
 
 # Secondi tra un'arma e la prossima (migliora con fire_rate)
 func shot_interval() -> float:
-	return maxf(1.0, 8.0 - float(get_upg_level("fire_rate")))
+	return maxf(0.5, 3.0 - float(get_upg_level("fire_rate")) * 0.5)
 
 # Numero di armi disponibili per round (migliora con ammo)
 func shots_per_round() -> int:

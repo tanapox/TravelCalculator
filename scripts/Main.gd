@@ -190,11 +190,32 @@ func _build_hud() -> void:
 	# Pulsante START (centro schermo, visibile solo in fase WAITING)
 	_hud_start = Button.new()
 	_hud_start.text     = "▶  START"
-	_hud_start.size     = Vector2(260.0, 68.0)
-	_hud_start.position = Vector2(510.0, 390.0)
-	_hud_start.add_theme_font_size_override("font_size", 30)
+	_hud_start.size     = Vector2(300.0, 72.0)
+	_hud_start.position = Vector2(490.0, 380.0)
+	_hud_start.add_theme_font_size_override("font_size", 32)
 	_hud_start.visible  = false
 	_hud_start.pressed.connect(_begin_shooting)
+
+	var _sb_n := StyleBoxFlat.new()
+	_sb_n.bg_color = Color(0.08, 0.62, 0.18)
+	_sb_n.set_corner_radius_all(12)
+	_sb_n.border_width_bottom = 4
+	_sb_n.border_color = Color(0.04, 0.38, 0.10)
+
+	var _sb_h := StyleBoxFlat.new()
+	_sb_h.bg_color = Color(0.12, 0.82, 0.26)
+	_sb_h.set_corner_radius_all(12)
+
+	var _sb_p := StyleBoxFlat.new()
+	_sb_p.bg_color = Color(0.05, 0.46, 0.13)
+	_sb_p.set_corner_radius_all(12)
+
+	_hud_start.add_theme_stylebox_override("normal",  _sb_n)
+	_hud_start.add_theme_stylebox_override("hover",   _sb_h)
+	_hud_start.add_theme_stylebox_override("pressed", _sb_p)
+	_hud_start.add_theme_color_override("font_color",         Color(1.0, 1.0, 1.0))
+	_hud_start.add_theme_color_override("font_hover_color",   Color(1.0, 1.0, 0.9))
+	_hud_start.add_theme_color_override("font_pressed_color", Color(0.85, 1.0, 0.85))
 	_hud.add_child(_hud_start)
 
 # ── Sbarra ────────────────────────────────────────────────────────────────────
@@ -263,7 +284,7 @@ func _start_round() -> void:
 	_round += 1
 
 	_clear_balls()
-	_terrain.set_active_rows(mini(_round, DestructibleArea.ROWS))
+	_terrain.set_active_rows(mini(_round * 2, DestructibleArea.ROWS))
 	_terrain.reinit()
 	_spawn_balls()
 	_create_barrier()

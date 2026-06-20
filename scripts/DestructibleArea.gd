@@ -3,13 +3,13 @@ extends Node2D
 
 # ── Layout ────────────────────────────────────────────────────────────────────
 
-const CELL:       int = 8
+const CELL:       int = 4
 const LAUNCHER_W: int = 80
 const AREA_W:     int = 1280
 const AREA_H:     int = 240
 const GRID_X:     int = LAUNCHER_W                             # x dove inizia la griglia
-const COLS:       int = (AREA_W - LAUNCHER_W * 2) / CELL      # 140
-const ROWS:       int = AREA_H / CELL                          # 30
+const COLS:       int = (AREA_W - LAUNCHER_W * 2) / CELL      # 280
+const ROWS:       int = AREA_H / CELL                          # 60
 
 const LEFT_LAUNCHER:  Vector2 = Vector2(40.0,  120.0)
 const RIGHT_LAUNCHER: Vector2 = Vector2(1240.0, 120.0)
@@ -205,7 +205,7 @@ func init_noise(seed_val: int = -1) -> void:
 		seed_val = randi()
 	var noise := FastNoiseLite.new()
 	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
-	noise.frequency  = 0.07
+	noise.frequency  = 0.035
 	noise.seed       = seed_val
 	var hp_m := GameState.terrain_hp_mult()
 	for row: int in ROWS:

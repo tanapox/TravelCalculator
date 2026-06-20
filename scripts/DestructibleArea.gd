@@ -7,14 +7,14 @@ const CELL:       int = 8
 const LAUNCHER_W: int = 80
 const AREA_W:     int = 1280
 const AREA_H:     int = 240
-const GRID_X:     int = LAUNCHER_W
-const COLS:       int = (AREA_W - LAUNCHER_W * 2) / CELL  # 140
-const ROWS:       int = AREA_H / CELL                      # 30
+const GRID_X:     int = LAUNCHER_W                             # x dove inizia la griglia
+const COLS:       int = (AREA_W - LAUNCHER_W * 2) / CELL      # 140
+const ROWS:       int = AREA_H / CELL                          # 30
 
 const LEFT_LAUNCHER:  Vector2 = Vector2(40.0,  120.0)
 const RIGHT_LAUNCHER: Vector2 = Vector2(1240.0, 120.0)
 
-# ── Palette: [Color, hp_max, nome] ───────────────────────────────────────────
+# ── Palette ───────────────────────────────────────────────────────────────────
 
 const PALETTE: Array = [
 	[Color(0.95, 0.95, 0.92),  10.0,   "Gesso"],
@@ -39,7 +39,7 @@ const WEAPONS: Dictionary = {
 	Weapon.WORM:         {key=KEY_6, name="Verme",         color=Color(0.85, 0.5, 0.1), proj_r=7.0,  impact_r= 0.0, dmg=   0.0, speed=1.0, desc="mangia il terreno a caso"},
 }
 
-# ── Inner class per overlay (sopra la texture del terrain) ───────────────────
+# ── Inner overlay node ────────────────────────────────────────────────────────
 
 class OverlayNode extends Node2D:
 	var area: DestructibleArea
@@ -60,17 +60,15 @@ var _tex:     ImageTexture
 var _sprite:  Sprite2D
 var _overlay: OverlayNode
 
-# Proiettili in volo: [{start, target, arc_h, t, speed, weapon, done}]
+# Fisica per riga: ogni riga ha uno StaticBody2D con segmenti di celle vive.
+# Quando una cella viene distrutta quella riga viene rigenerata.
+var _physics_rows:  Array      = []   # Array[StaticBody2D]
+var _dirty_rows:    Dictionary = {}   # row_index -> true
+
 var _projectiles: Array = []
-
-# Vermi attivi: [{col, row, steps, timer}]
-var _worms: Array = []
-
-# Acido: idx → forza rimanente
-var _acid_cells: Dictionary = {}
-
-# Effetti visivi esplosione: [{pos, r, max_r, dur, t, color}]
-var _vfx: Array = []
+var _worms:       Array = []
+var _acid_cells:  Dictionary = {}
+var _vfx:         Array = []
 
 var _flame_on:    bool  = false
 var _flame_timer: float = 0.0
@@ -90,8 +88,7 @@ func _ready() -> void:
 	_img = Image.create(COLS * CELL, ROWS * CELL, false, Image.FORMAT_RGBA8)
 	_redraw_all()
 
-	_tex = ImageTexture.create_from_image(_img)
-
+	_tex             = ImageTexture.create_from_image(_img)
 	_sprite          = Sprite2D.new()
 	_sprite.centered = false
 	_sprite.position = Vector2(GRID_X, 0.0)
@@ -99,8 +96,8 @@ func _ready() -> void:
 	_sprite.texture  = _tex
 	add_child(_sprite)
 
-	_overlay      = OverlayNode.new()
-	_overlay.area = self
+	_overlay         = OverlayNode.new()
+	_overlay.area    = self
 	_overlay.z_index = 5
 	add_child(_overlay)
 
@@ -111,6 +108,66 @@ func _ready() -> void:
 	_label.z_index = 10
 	add_child(_label)
 	_refresh_label()
+
+	_setup_physics()
+
+# ── Fisica ────────────────────────────────────────────────────────────────────
+# Ogni riga del terrain ha uno StaticBody2D con rettangoli per le
+# "strisce" di celle ancora vive. Quando una cella viene distrutta
+# la riga viene ricalcolata a fine frame (_dirty_rows).
+
+func _setup_physics() -> void:
+	# Pareti dei pannelli laterali (indistruttibili)
+	for x_center in [LAUNCHER_W / 2.0, AREA_W - LAUNCHER_W / 2.0]:
+		var wall := StaticBody2D.new()
+		wall.position = Vector2.ZERO
+		var cs   := CollisionShape2D.new()
+		var rect := RectangleShape2D.new()
+		rect.size    = Vector2(LAUNCHER_W, AREA_H)
+		cs.position  = Vector2(x_center, AREA_H / 2.0)
+		cs.shape     = rect
+		wall.add_child(cs)
+		add_child(wall)
+
+	# Un StaticBody2D per riga di terrain
+	for row in ROWS:
+		var body := StaticBody2D.new()
+		body.position = Vector2.ZERO
+		add_child(body)
+		_physics_rows.append(body)
+
+	_rebuild_all_rows()
+
+func _rebuild_all_rows() -> void:
+	for row in ROWS:
+		_rebuild_row(row)
+
+func _rebuild_row(row: int) -> void:
+	var body: StaticBody2D = _physics_rows[row]
+	for child in body.get_children():
+		child.free()
+
+	var col := 0
+	while col < COLS:
+		if _hp[row * COLS + col] <= 0.0:
+			col += 1
+			continue
+		# Inizio di una striscia di celle vive
+		var start_col := col
+		while col < COLS and _hp[row * COLS + col] > 0.0:
+			col += 1
+		var end_col := col
+
+		var span_w   := float(end_col - start_col) * CELL
+		var center_x := GRID_X + float(start_col + end_col) * 0.5 * CELL
+		var center_y := float(row) * CELL + CELL * 0.5
+
+		var cs   := CollisionShape2D.new()
+		var rect := RectangleShape2D.new()
+		rect.size   = Vector2(span_w, CELL)
+		cs.position = Vector2(center_x, center_y)
+		cs.shape    = rect
+		body.add_child(cs)
 
 # ── Modalità colore ───────────────────────────────────────────────────────────
 
@@ -128,18 +185,15 @@ func init_noise(seed_val: int = -1) -> void:
 			var t:     float = clampf(n * 0.45 + depth * 0.65, 0.0, 1.0)
 			_set_mat(col, row, int(t * PALETTE.size()))
 	if _img:
-		_redraw_all()
-		_tex.update(_img)
+		_redraw_all(); _tex.update(_img); _rebuild_all_rows()
 
 func init_random() -> void:
 	for row in ROWS:
 		for col in COLS:
 			_set_mat(col, row, randi() % PALETTE.size())
 	if _img:
-		_redraw_all()
-		_tex.update(_img)
+		_redraw_all(); _tex.update(_img); _rebuild_all_rows()
 
-# I pixel scuri dell'immagine diventano materiale duro, quelli chiari fragile.
 func init_from_image(path: String) -> bool:
 	var src := Image.load_from_file(path)
 	if not src:
@@ -155,8 +209,7 @@ func init_from_image(path: String) -> bool:
 			_max_hp[idx]   = hp
 			_hp[idx]       = hp
 	if _img:
-		_redraw_all()
-		_tex.update(_img)
+		_redraw_all(); _tex.update(_img); _rebuild_all_rows()
 	return true
 
 func set_cell(col: int, row: int, palette_idx: int) -> void:
@@ -164,8 +217,7 @@ func set_cell(col: int, row: int, palette_idx: int) -> void:
 		_set_mat(col, row, palette_idx)
 
 func flush_manual() -> void:
-	_redraw_all()
-	_tex.update(_img)
+	_redraw_all(); _tex.update(_img); _rebuild_all_rows()
 
 func _set_mat(col: int, row: int, pal: int) -> void:
 	pal = clampi(pal, 0, PALETTE.size() - 1)
@@ -194,7 +246,7 @@ func _draw_cell(col: int, row: int) -> void:
 	_img.fill_rect(Rect2i(col * CELL, row * CELL, CELL, 1), c.darkened(0.38))
 	_img.fill_rect(Rect2i(col * CELL, row * CELL, 1, CELL), c.darkened(0.38))
 
-# ── _draw: solo pannelli laterali (z sotto la texture) ───────────────────────
+# ── _draw: pannelli laterali (z sotto la texture) ────────────────────────────
 
 func _draw() -> void:
 	_draw_launcher_panel(LEFT_LAUNCHER,  Rect2(0,              0, LAUNCHER_W, AREA_H), true)
@@ -202,31 +254,24 @@ func _draw() -> void:
 
 func _draw_launcher_panel(center: Vector2, rect: Rect2, faces_right: bool) -> void:
 	draw_rect(rect, Color(0.13, 0.13, 0.16))
-
-	# Bulloni decorativi agli angoli
 	for corner in [rect.position + Vector2(10, 10),
 				   rect.position + Vector2(rect.size.x - 10, 10),
 				   rect.position + Vector2(10, rect.size.y - 10),
 				   rect.position + Vector2(rect.size.x - 10, rect.size.y - 10)]:
 		draw_circle(corner, 5.0, Color(0.25, 0.25, 0.28))
 		draw_circle(corner, 3.0, Color(0.35, 0.35, 0.38))
-
-	# Canna del cannone (punta verso il terrain)
 	var barrel_w := 32.0
 	var barrel_h := 14.0
 	var bx := center.x + (6.0 if faces_right else -barrel_w - 6.0)
 	draw_rect(Rect2(bx, center.y - barrel_h * 0.5, barrel_w, barrel_h), Color(0.30, 0.30, 0.35))
 	draw_rect(Rect2(bx, center.y - barrel_h * 0.5, barrel_w, 2), Color(0.40, 0.40, 0.45))
-
-	# Corpo del cannone
 	draw_circle(center, 24.0, Color(0.18, 0.18, 0.21))
 	draw_circle(center, 20.0, Color(0.26, 0.26, 0.30))
 	draw_circle(center, 12.0, Color(0.38, 0.38, 0.43))
-	# Punto colorato = arma attiva
-	draw_circle(center, 7.0, WEAPONS[current_weapon].color)
-	draw_circle(center, 3.5, WEAPONS[current_weapon].color.lightened(0.5))
+	draw_circle(center, 7.0,  WEAPONS[current_weapon].color)
+	draw_circle(center, 3.5,  WEAPONS[current_weapon].color.lightened(0.5))
 
-# ── Overlay draw: proiettili, vermi, VFX ─────────────────────────────────────
+# ── Overlay draw ──────────────────────────────────────────────────────────────
 
 func _draw_overlay() -> void:
 	_draw_vfx_overlay()
@@ -237,7 +282,6 @@ func _draw_projectiles_overlay() -> void:
 	for proj in _projectiles:
 		var w   := WEAPONS[proj.weapon]
 		var pos := _proj_pos(proj)
-		# Scia
 		for i in 6:
 			var tt := proj.t - float(i + 1) * 0.025
 			if tt < 0.0:
@@ -245,7 +289,6 @@ func _draw_projectiles_overlay() -> void:
 			var tp := _proj_pos_at(proj, tt)
 			var a  := maxf(0.0, 0.28 - i * 0.04)
 			draw_circle(tp, w.proj_r * (0.6 - i * 0.08), Color(w.color.r, w.color.g, w.color.b, a))
-		# Proiettile
 		draw_circle(pos, w.proj_r, w.color)
 		draw_circle(pos, w.proj_r * 0.45, w.color.lightened(0.5))
 
@@ -259,10 +302,9 @@ func _draw_worms_overlay() -> void:
 
 func _draw_vfx_overlay() -> void:
 	for fx in _vfx:
-		var progress: float = fx.t / fx.dur
-		var alpha: float    = (1.0 - progress) * 0.6
-		draw_circle(fx.pos, fx.r,         Color(fx.color.r, fx.color.g, fx.color.b, alpha * 0.5))
-		draw_circle(fx.pos, fx.r * 0.55,  Color(1.0, 0.95, 0.7, alpha))
+		var alpha := (1.0 - fx.t / fx.dur) * 0.6
+		draw_circle(fx.pos, fx.r,        Color(fx.color.r, fx.color.g, fx.color.b, alpha * 0.5))
+		draw_circle(fx.pos, fx.r * 0.55, Color(1.0, 0.95, 0.7, alpha))
 
 # ── Process ───────────────────────────────────────────────────────────────────
 
@@ -270,7 +312,6 @@ func _process(delta: float) -> void:
 	var terrain_dirty := false
 	var need_overlay  := false
 
-	# Proiettili in volo
 	for proj in _projectiles:
 		proj.t = minf(proj.t + proj.speed * delta, 1.0)
 		if proj.t >= 1.0 and not proj.get("done", false):
@@ -278,10 +319,8 @@ func _process(delta: float) -> void:
 			_on_impact(proj)
 			terrain_dirty = true
 		need_overlay = true
-
 	_projectiles = _projectiles.filter(func(p): return not p.get("done", false))
 
-	# Lanciafiamme: raffica rapida
 	if _flame_on:
 		_flame_timer += delta
 		while _flame_timer >= FLAME_INTERVAL:
@@ -289,7 +328,6 @@ func _process(delta: float) -> void:
 			_launch_flame_shot()
 		need_overlay = true
 
-	# Vermi
 	for worm in _worms:
 		if worm.steps <= 0:
 			continue
@@ -299,10 +337,8 @@ func _process(delta: float) -> void:
 			_worm_step(worm)
 			terrain_dirty = true
 		need_overlay = true
-
 	_worms = _worms.filter(func(w): return w.steps > 0)
 
-	# Acido
 	if not _acid_cells.is_empty():
 		var to_spread: Dictionary = {}
 		var to_remove: Array      = []
@@ -324,13 +360,18 @@ func _process(delta: float) -> void:
 			_acid_cells[idx] = to_spread[idx]
 		need_overlay = true
 
-	# VFX
 	if not _vfx.is_empty():
 		for fx in _vfx:
 			fx.t += delta
 			fx.r  = lerpf(0.0, fx.max_r, fx.t / fx.dur)
 		_vfx = _vfx.filter(func(fx): return fx.t < fx.dur)
 		need_overlay = true
+
+	# Rigenera le righe di fisica che hanno avuto celle distrutte questo frame
+	if not _dirty_rows.is_empty():
+		for row in _dirty_rows:
+			_rebuild_row(row)
+		_dirty_rows.clear()
 
 	if terrain_dirty:
 		_tex.update(_img)
@@ -354,8 +395,7 @@ func _input(event: InputEvent) -> void:
 						   and local.y >= 0.0 and local.y < AREA_H)
 		if event.pressed and in_terrain:
 			if current_weapon == Weapon.FLAMETHROWER:
-				_flame_on    = true
-				_flame_timer = 0.0
+				_flame_on = true; _flame_timer = 0.0
 			else:
 				_launch(local, current_weapon)
 		else:
@@ -366,19 +406,17 @@ func _input(event: InputEvent) -> void:
 		if local.x < GRID_X or local.x >= AREA_W - GRID_X or local.y < 0.0 or local.y >= AREA_H:
 			_flame_on = false
 
-# ── Lancio proiettili ─────────────────────────────────────────────────────────
+# ── Lancio ────────────────────────────────────────────────────────────────────
 
-# Il cannone sul lato opposto al bersaglio spara, così l'arco attraversa lo schermo.
 func _pick_launcher(target: Vector2) -> Vector2:
 	return RIGHT_LAUNCHER if target.x < AREA_W * 0.5 else LEFT_LAUNCHER
 
 func _launch(target: Vector2, weapon: Weapon) -> void:
 	var launcher := _pick_launcher(target)
-	var dist     := launcher.distance_to(target)
 	_projectiles.append({
 		"start":  launcher,
 		"target": target,
-		"arc_h":  dist * 0.40,
+		"arc_h":  launcher.distance_to(target) * 0.40,
 		"t":      0.0,
 		"speed":  WEAPONS[weapon].speed,
 		"weapon": weapon,
@@ -387,10 +425,8 @@ func _launch(target: Vector2, weapon: Weapon) -> void:
 func _launch_flame_shot() -> void:
 	var mp := get_viewport().get_mouse_position() - position
 	if mp.x < GRID_X or mp.x >= AREA_W - GRID_X or mp.y < 0.0 or mp.y >= AREA_H:
-		_flame_on = false
-		return
-	var spread := Vector2(randf_range(-18.0, 18.0), randf_range(-12.0, 12.0))
-	_launch(mp + spread, Weapon.FLAMETHROWER)
+		_flame_on = false; return
+	_launch(mp + Vector2(randf_range(-18.0, 18.0), randf_range(-12.0, 12.0)), Weapon.FLAMETHROWER)
 
 func _proj_pos(proj: Dictionary) -> Vector2:
 	return _proj_pos_at(proj, proj.t)
@@ -430,8 +466,7 @@ func _add_vfx(pos: Vector2, max_r: float, color: Color, dur: float) -> void:
 
 func _apply_acid(pos: Vector2, radius: float) -> void:
 	var cr := int(ceil(radius / CELL))
-	var cc := _local_to_cell(pos).x
-	var rc := _local_to_cell(pos).y
+	var cc := _local_to_cell(pos).x; var rc := _local_to_cell(pos).y
 	for dy in range(-cr, cr + 1):
 		for dx in range(-cr, cr + 1):
 			var c := cc + dx; var r := rc + dy
@@ -443,45 +478,31 @@ func _apply_acid(pos: Vector2, radius: float) -> void:
 
 func _spawn_worm(pos: Vector2) -> void:
 	var cell := _local_to_cell(pos)
-	if not _in_bounds(cell.x, cell.y):
-		return
-	_worms.append({"col": cell.x, "row": cell.y, "steps": 240, "timer": 0.0})
+	if _in_bounds(cell.x, cell.y):
+		_worms.append({"col": cell.x, "row": cell.y, "steps": 240, "timer": 0.0})
 
 func _worm_step(worm: Dictionary) -> void:
 	var dirs := [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]
 	dirs.shuffle()
-
-	var best_c := -1
-	var best_r := -1
-	var found_solid := false
-
+	var best_c := -1; var best_r := -1; var found_solid := false
 	for d in dirs:
-		var nc := worm.col + d[0]
-		var nr := worm.row + d[1]
+		var nc := worm.col + d[0]; var nr := worm.row + d[1]
 		if not _in_bounds(nc, nr):
 			continue
 		if _hp[nr * COLS + nc] > 0.0:
-			best_c = nc; best_r = nr
-			found_solid = true
-			break
+			best_c = nc; best_r = nr; found_solid = true; break
 		elif best_c < 0:
 			best_c = nc; best_r = nr
-
 	if best_c < 0:
-		worm.steps = 0
-		return
-
-	worm.col   = best_c
-	worm.row   = best_r
-	worm.steps -= 1
+		worm.steps = 0; return
+	worm.col = best_c; worm.row = best_r; worm.steps -= 1
 	_circle_dmg(_cell_to_local(worm.col, worm.row), CELL * 1.6, 9999.0)
 
 # ── Danno ─────────────────────────────────────────────────────────────────────
 
 func _circle_dmg(center: Vector2, radius: float, damage: float) -> void:
 	var cr := int(ceil(radius / CELL))
-	var cc := _local_to_cell(center).x
-	var rc := _local_to_cell(center).y
+	var cc := _local_to_cell(center).x; var rc := _local_to_cell(center).y
 	for dy in range(-cr, cr + 1):
 		for dx in range(-cr, cr + 1):
 			var c := cc + dx; var r := rc + dy
@@ -489,14 +510,16 @@ func _circle_dmg(center: Vector2, radius: float, damage: float) -> void:
 				continue
 			var dist := _cell_to_local(c, r).distance_to(center)
 			if dist <= radius:
-				var falloff := 1.0 - (dist / radius)
-				_dmg_idx(r * COLS + c, damage * (0.25 + 0.75 * falloff))
+				_dmg_idx(r * COLS + c, damage * (0.25 + 0.75 * (1.0 - dist / radius)))
 
 func _dmg_idx(idx: int, amount: float) -> void:
 	if _hp[idx] <= 0.0:
 		return
 	_hp[idx] = maxf(0.0, _hp[idx] - amount)
 	_draw_cell(idx % COLS, idx / COLS)
+	if _hp[idx] <= 0.0:
+		# Cella appena distrutta: rigenera la fisica di quella riga a fine frame
+		_dirty_rows[idx / COLS] = true
 
 # ── Coordinate ────────────────────────────────────────────────────────────────
 

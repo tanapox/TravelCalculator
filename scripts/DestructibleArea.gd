@@ -49,7 +49,10 @@ class OverlayNode extends Node2D:
 
 # ── Stato ─────────────────────────────────────────────────────────────────────
 
-var current_weapon: Weapon = Weapon.BULLET
+signal weapon_fired
+
+var current_weapon:   Weapon = Weapon.BULLET
+var shots_available:  int    = 0   # impostato da Main ogni round
 
 var _hp:       PackedFloat32Array
 var _max_hp:   PackedFloat32Array
@@ -405,6 +408,10 @@ func _input(event: InputEvent) -> void:
 		var in_terrain := (local.x >= GRID_X and local.x < AREA_W - GRID_X
 						   and local.y >= 0.0 and local.y < AREA_H)
 		if event.pressed and in_terrain:
+			if shots_available <= 0:
+				return   # nessuna arma disponibile questo round
+			shots_available -= 1
+			weapon_fired.emit()
 			if current_weapon == Weapon.FLAMETHROWER:
 				_flame_on = true; _flame_timer = 0.0
 			else:
@@ -416,6 +423,10 @@ func _input(event: InputEvent) -> void:
 		var local := event.position - position
 		if local.x < GRID_X or local.x >= AREA_W - GRID_X or local.y < 0.0 or local.y >= AREA_H:
 			_flame_on = false
+
+func stop_firing() -> void:
+	_flame_on       = false
+	shots_available = 0
 
 # ── Lancio ────────────────────────────────────────────────────────────────────
 

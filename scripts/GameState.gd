@@ -108,7 +108,7 @@ func effect_text(id: String) -> String:
 	var l := get_upg_level(id)
 	match id:
 		"weapon_power": return "+%d%% danno (ora ×%.2f)" % [l * 25, weapon_damage_mult()]
-		"fire_rate":    return "+%d%% velocità (ora ×%.2f)" % [l * 20, projectile_speed_mult()]
+		"fire_rate":    return "+%d%% velocità, int. %.0fs" % [l * 20, shot_interval()]
 		"critical":
 			var pct := [0, 5, 10, 20, 35, 50]
 			return "%d%% probabilità critico (×3)" % pct[l]
@@ -117,6 +117,7 @@ func effect_text(id: String) -> String:
 		"slots":        return "%d slot totali" % slot_count()
 		"multiplier":   return "×%.1f su tutti i moltiplicatori" % multiplier_boost()
 		"worm_power":   return "+%d passi, raggio ×%.1f" % [l * 80, worm_eat_radius()]
+		"ammo":         return "%d armi/round, round %.0fs" % [shots_per_round(), shot_interval() * shots_per_round()]
 	return ""
 
 # Soglia di total_earned per raggiungere il livello lvl (caricata da file)
@@ -161,6 +162,14 @@ func terrain_hp_mult() -> float:
 
 func flame_interval() -> float:
 	return maxf(0.015, 0.07 / projectile_speed_mult())
+
+# Secondi tra un'arma e la prossima (migliora con fire_rate)
+func shot_interval() -> float:
+	return maxf(1.0, 8.0 - float(get_upg_level("fire_rate")))
+
+# Numero di armi disponibili per round (migliora con ammo)
+func shots_per_round() -> int:
+	return 2 + get_upg_level("ammo")
 
 func slot_count() -> int:
 	return 10 + get_upg_level("slots") * 3

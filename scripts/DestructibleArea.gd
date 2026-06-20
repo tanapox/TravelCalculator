@@ -31,12 +31,12 @@ const PALETTE: Array = [
 enum Weapon { BULLET, BOMB, MISSILE, FLAMETHROWER, ACID, WORM }
 
 const WEAPONS: Dictionary = {
-	Weapon.BULLET:       {key=KEY_1, name="Proiettile",    color=Color(1.0, 1.0, 0.3),  proj_r=4.0,  impact_r= 0.0, dmg=9999.0, speed=2.5, desc="distrugge 1 cella"},
-	Weapon.BOMB:         {key=KEY_2, name="Bomba",         color=Color(1.0, 0.45, 0.1), proj_r=8.0,  impact_r=42.0, dmg= 180.0, speed=1.4, desc="esplosione media"},
-	Weapon.MISSILE:      {key=KEY_3, name="Missile",       color=Color(0.9, 0.9,  0.9), proj_r=6.0,  impact_r=85.0, dmg= 260.0, speed=1.8, desc="esplosione grande"},
-	Weapon.FLAMETHROWER: {key=KEY_4, name="Lanciafiamme",  color=Color(1.0, 0.55, 0.0), proj_r=5.0,  impact_r=20.0, dmg=  40.0, speed=3.2, desc="tieni premuto"},
-	Weapon.ACID:         {key=KEY_5, name="Acido",         color=Color(0.3, 1.0,  0.2), proj_r=6.0,  impact_r=14.0, dmg=   0.0, speed=1.2, desc="corrosivo + si espande"},
-	Weapon.WORM:         {key=KEY_6, name="Verme",         color=Color(0.85, 0.5, 0.1), proj_r=7.0,  impact_r= 0.0, dmg=   0.0, speed=1.0, desc="mangia il terreno a caso"},
+	Weapon.BULLET:       {key=KEY_1, name="Proiettile",    color=Color(1.0, 1.0, 0.3),  proj_r=5.0,  impact_r= 0.0, dmg=9999.0, speed=2.8, rate=1.2,  arc_h=25.0,  desc="distrugge 1 cella"},
+	Weapon.BOMB:         {key=KEY_2, name="Bomba",         color=Color(1.0, 0.45, 0.1), proj_r=9.0,  impact_r=42.0, dmg= 180.0, speed=1.2, rate=3.0,  arc_h=110.0, desc="esplosione media"},
+	Weapon.MISSILE:      {key=KEY_3, name="Missile",       color=Color(0.9, 0.9,  0.9), proj_r=7.0,  impact_r=85.0, dmg= 260.0, speed=1.6, rate=4.0,  arc_h=70.0,  desc="esplosione grande"},
+	Weapon.FLAMETHROWER: {key=KEY_4, name="Lanciafiamme",  color=Color(1.0, 0.55, 0.0), proj_r=5.0,  impact_r=20.0, dmg=  40.0, speed=3.5, rate=0.12, arc_h=12.0,  desc="raffiche rapide"},
+	Weapon.ACID:         {key=KEY_5, name="Acido",         color=Color(0.3, 1.0,  0.2), proj_r=6.0,  impact_r=14.0, dmg=   0.0, speed=1.2, rate=1.8,  arc_h=90.0,  desc="corrosivo + si espande"},
+	Weapon.WORM:         {key=KEY_6, name="Verme",         color=Color(0.85, 0.5, 0.1), proj_r=7.0,  impact_r= 0.0, dmg=   0.0, speed=1.0, rate=5.0,  arc_h=40.0,  desc="mangia il terreno a caso"},
 }
 
 # ── Inner overlay node ────────────────────────────────────────────────────────
@@ -96,8 +96,7 @@ var _worms:       Array = []
 var _acid_cells:  Dictionary = {}
 var _vfx:         Array = []
 
-var _flame_on:    bool  = false
-var _flame_timer: float = 0.0
+var _placed_weapons: Array = []
 
 var _label: Label
 
@@ -253,7 +252,9 @@ func reinit() -> void:
 	_projectiles.clear()
 	_acid_cells.clear()
 	_vfx.clear()
+	_placed_weapons.clear()
 	init_noise()
+	queue_redraw()
 
 func _set_mat(col: int, row: int, pal: int) -> void:
 	pal = clampi(pal, 0, PALETTE.size() - 1)
@@ -287,6 +288,14 @@ func _draw_cell(col: int, row: int) -> void:
 func _draw() -> void:
 	_draw_launcher_panel(LEFT_LAUNCHER,  Rect2(0,              0, LAUNCHER_W, AREA_H), true)
 	_draw_launcher_panel(RIGHT_LAUNCHER, Rect2(AREA_W - LAUNCHER_W, 0, LAUNCHER_W, AREA_H), false)
+	for pw in _placed_weapons:
+		var cx: float  = float(LAUNCHER_W) * 0.5 if not pw.from_right \
+		                 else float(AREA_W) - float(LAUNCHER_W) * 0.5
+		var cy: float  = float(pw.panel_y)
+		var col: Color = WEAPONS[pw.weapon].color
+		draw_circle(Vector2(cx, cy), 16.0, col.darkened(0.5))
+		draw_circle(Vector2(cx, cy), 11.0, col)
+		draw_circle(Vector2(cx, cy), 5.0,  col.lightened(0.6))
 
 func _draw_launcher_panel(center: Vector2, rect: Rect2, faces_right: bool) -> void:
 	draw_rect(rect, Color(0.13, 0.13, 0.16))
@@ -323,12 +332,11 @@ func _process(delta: float) -> void:
 		need_overlay = true
 	_projectiles = _projectiles.filter(func(p): return not p.get("done", false))
 
-	if _flame_on:
-		_flame_timer += delta
-		var fi := GameState.flame_interval()
-		while _flame_timer >= fi:
-			_flame_timer -= fi
-			_launch_flame_shot()
+	for pw in _placed_weapons:
+		pw.timer -= delta
+		if pw.timer <= 0.0:
+			pw.timer += float(WEAPONS[pw.weapon].rate)
+			_launch_from_panel(float(pw.panel_y), bool(pw.from_right), pw.weapon)
 		need_overlay = true
 
 	for worm in _worms:
@@ -392,35 +400,29 @@ func _input(event: InputEvent) -> void:
 				queue_redraw()
 				return
 
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		var local: Vector2 = (event as InputEventMouse).position - position
 		var in_left_panel  := local.y >= 0.0 and local.y < float(AREA_H) \
 		                      and local.x >= 0.0 and local.x < float(LAUNCHER_W)
 		var in_right_panel := local.y >= 0.0 and local.y < float(AREA_H) \
 		                      and local.x >= float(AREA_W - LAUNCHER_W) and local.x < float(AREA_W)
-		if event.pressed and (in_left_panel or in_right_panel):
+		if in_left_panel or in_right_panel:
 			if shots_available <= 0:
 				return
 			shots_available -= 1
 			weapon_fired.emit()
-			if current_weapon == Weapon.FLAMETHROWER:
-				_flame_on = true; _flame_timer = 0.0
-			else:
-				_launch_from_panel(local.y, in_right_panel, current_weapon)
-		if not event.pressed:
-			_flame_on = false
-
-	if event is InputEventMouseMotion and _flame_on:
-		var local: Vector2 = (event as InputEventMouse).position - position
-		var still_in_panel := (local.y >= 0.0 and local.y < float(AREA_H)) and \
-		                      ((local.x >= 0.0 and local.x < float(LAUNCHER_W)) or \
-		                       (local.x >= float(AREA_W - LAUNCHER_W) and local.x < float(AREA_W)))
-		if not still_in_panel:
-			_flame_on = false
+			_placed_weapons.append({
+				"panel_y":    local.y,
+				"from_right": in_right_panel,
+				"weapon":     current_weapon,
+				"timer":      0.0,
+			})
+			queue_redraw()
 
 func stop_firing() -> void:
-	_flame_on       = false
+	_placed_weapons.clear()
 	shots_available = 0
+	queue_redraw()
 
 # ── Lancio ────────────────────────────────────────────────────────────────────
 
@@ -457,19 +459,11 @@ func _launch_from_panel(panel_y: float, from_right: bool, weapon: Weapon) -> voi
 	_projectiles.append({
 		"start":  launcher,
 		"target": target,
-		"arc_h":  35.0,
+		"arc_h":  float(WEAPONS[weapon].arc_h),
 		"t":      0.0,
 		"speed":  spd,
 		"weapon": weapon,
 	})
-
-func _launch_flame_shot() -> void:
-	var mp: Vector2 = get_viewport().get_mouse_position() - position
-	var in_left  := mp.y >= 0.0 and mp.y < float(AREA_H) and mp.x >= 0.0 and mp.x < float(LAUNCHER_W)
-	var in_right := mp.y >= 0.0 and mp.y < float(AREA_H) and mp.x >= float(AREA_W - LAUNCHER_W) and mp.x < float(AREA_W)
-	if not (in_left or in_right):
-		_flame_on = false; return
-	_launch_from_panel(mp.y + randf_range(-12.0, 12.0), in_right, Weapon.FLAMETHROWER)
 
 func _proj_pos(proj: Dictionary) -> Vector2:
 	return _proj_pos_at(proj, proj.t)

@@ -440,7 +440,7 @@ func _pick_launcher(target: Vector2) -> Vector2:
 
 func _launch(target: Vector2, weapon: Weapon) -> void:
 	var launcher := _pick_launcher(target)
-	var spd      := WEAPONS[weapon].speed * GameState.projectile_speed_mult()
+	var spd: float = float(WEAPONS[weapon].speed) * GameState.projectile_speed_mult()
 	_projectiles.append({
 		"start":  launcher,
 		"target": target,

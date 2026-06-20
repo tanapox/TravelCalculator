@@ -57,7 +57,7 @@ var _hud_timer:    Label
 var _hud_shots:    Label
 var _hud_weapon:   Label
 var _hud_flash:    Label
-var _hud_start:    Button
+var _hud_start:    Control
 
 # ── Init ──────────────────────────────────────────────────────────────────────
 
@@ -187,35 +187,32 @@ func _build_hud() -> void:
 	_hud_flash.visible = false
 	_hud.add_child(_hud_flash)
 
-	# Pulsante START (centro schermo, visibile solo in fase WAITING)
-	_hud_start = Button.new()
-	_hud_start.text     = "▶  START"
-	_hud_start.size     = Vector2(300.0, 72.0)
+	# Pulsante START — Control puro per evitare problemi di tema di Godot
+	# Click rilevato manualmente in _input(). SPAZIO funziona come scorciatoia.
+	_hud_start = Control.new()
 	_hud_start.position = Vector2(490.0, 380.0)
-	_hud_start.add_theme_font_size_override("font_size", 32)
+	_hud_start.size     = Vector2(300.0, 72.0)
 	_hud_start.visible  = false
-	_hud_start.pressed.connect(_begin_shooting)
 
-	var _sb_n := StyleBoxFlat.new()
-	_sb_n.bg_color = Color(0.08, 0.62, 0.18)
-	_sb_n.set_corner_radius_all(12)
-	_sb_n.border_width_bottom = 4
-	_sb_n.border_color = Color(0.04, 0.38, 0.10)
+	var _start_bg := ColorRect.new()          # sfondo verde
+	_start_bg.size  = Vector2(300.0, 72.0)
+	_start_bg.color = Color(0.06, 0.52, 0.14)
+	_hud_start.add_child(_start_bg)
 
-	var _sb_h := StyleBoxFlat.new()
-	_sb_h.bg_color = Color(0.12, 0.82, 0.26)
-	_sb_h.set_corner_radius_all(12)
+	var _start_top := ColorRect.new()         # bordo superiore chiaro
+	_start_top.size  = Vector2(300.0, 3.0)
+	_start_top.color = Color(0.18, 0.90, 0.32)
+	_hud_start.add_child(_start_top)
 
-	var _sb_p := StyleBoxFlat.new()
-	_sb_p.bg_color = Color(0.05, 0.46, 0.13)
-	_sb_p.set_corner_radius_all(12)
+	var _start_lbl := Label.new()             # testo bianco
+	_start_lbl.position = Vector2(0.0, 18.0)
+	_start_lbl.size     = Vector2(300.0, 40.0)
+	_start_lbl.text     = "▶  START  (SPAZIO)"
+	_start_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_start_lbl.add_theme_font_size_override("font_size", 26)
+	_start_lbl.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))
+	_hud_start.add_child(_start_lbl)
 
-	_hud_start.add_theme_stylebox_override("normal",  _sb_n)
-	_hud_start.add_theme_stylebox_override("hover",   _sb_h)
-	_hud_start.add_theme_stylebox_override("pressed", _sb_p)
-	_hud_start.add_theme_color_override("font_color",         Color(1.0, 1.0, 1.0))
-	_hud_start.add_theme_color_override("font_hover_color",   Color(1.0, 1.0, 0.9))
-	_hud_start.add_theme_color_override("font_pressed_color", Color(0.85, 1.0, 0.85))
 	_hud.add_child(_hud_start)
 
 # ── Sbarra ────────────────────────────────────────────────────────────────────
@@ -284,7 +281,7 @@ func _start_round() -> void:
 	_round += 1
 
 	_clear_balls()
-	_terrain.set_active_rows(mini(_round * 2, DestructibleArea.ROWS))
+	_terrain.set_active_rows(mini(_round, DestructibleArea.ROWS))
 	_terrain.reinit()
 	_spawn_balls()
 	_create_barrier()
@@ -338,6 +335,13 @@ func _on_level_up(new_level: int) -> void:
 # ── Input ─────────────────────────────────────────────────────────────────────
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT \
+			and event.pressed and _phase == Phase.WAITING:
+		var pos: Vector2 = (event as InputEventMouse).position
+		if Rect2(490.0, 380.0, 300.0, 72.0).has_point(pos):
+			_begin_shooting()
+			return
+
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE:
 			get_tree().quit()

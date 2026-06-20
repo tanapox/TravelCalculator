@@ -26,7 +26,7 @@ const BALL_RADIUS_MAX: float = 46.0
 
 # ── Fasi del round ────────────────────────────────────────────────────────────
 
-enum Phase { SHOOTING, COLLECTING, BETWEEN_ROUNDS }
+enum Phase { SHOOTING, COLLECTING, BETWEEN_ROUNDS, WAITING }
 
 # ── Stato round ───────────────────────────────────────────────────────────────
 
@@ -57,6 +57,7 @@ var _hud_timer:    Label
 var _hud_shots:    Label
 var _hud_weapon:   Label
 var _hud_flash:    Label
+var _hud_start:    Button
 
 # ── Init ──────────────────────────────────────────────────────────────────────
 
@@ -186,6 +187,16 @@ func _build_hud() -> void:
 	_hud_flash.visible = false
 	_hud.add_child(_hud_flash)
 
+	# Pulsante START (centro schermo, visibile solo in fase WAITING)
+	_hud_start = Button.new()
+	_hud_start.text     = "▶  START"
+	_hud_start.size     = Vector2(260.0, 68.0)
+	_hud_start.position = Vector2(510.0, 390.0)
+	_hud_start.add_theme_font_size_override("font_size", 30)
+	_hud_start.visible  = false
+	_hud_start.pressed.connect(_begin_shooting)
+	_hud.add_child(_hud_start)
+
 # ── Sbarra ────────────────────────────────────────────────────────────────────
 
 func _create_barrier() -> void:
@@ -252,15 +263,22 @@ func _start_round() -> void:
 	_round += 1
 
 	_clear_balls()
+	_terrain.set_active_rows(mini(_round, DestructibleArea.ROWS))
 	_terrain.reinit()
 	_spawn_balls()
 	_create_barrier()
 
+	_phase = Phase.WAITING
+	_update_hud()
+
+func _begin_shooting() -> void:
+	if _phase != Phase.WAITING:
+		return
 	var interval := GameState.shot_interval()
 	var shots    := GameState.shots_per_round()
 	_round_timer   = interval * float(shots)
 	_shot_timer    = interval
-	_shots_to_give = shots - 1           # uno dato subito
+	_shots_to_give = shots - 1
 	_terrain.shots_available = 1
 
 	_phase = Phase.SHOOTING
@@ -302,6 +320,8 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE:
 			get_tree().quit()
+		elif event.keycode == KEY_SPACE:
+			_begin_shooting()
 		elif event.keycode == KEY_F11:
 			var win := get_window()
 			win.mode = Window.MODE_WINDOWED if win.mode == Window.MODE_FULLSCREEN \
@@ -320,6 +340,9 @@ func _process(delta: float) -> void:
 			_hud_flash.visible = false
 
 	match _phase:
+		Phase.WAITING:
+			pass
+
 		Phase.SHOOTING:
 			_round_timer -= delta
 			_shot_timer  -= delta
@@ -344,6 +367,12 @@ func _process(delta: float) -> void:
 
 func _update_hud() -> void:
 	match _phase:
+		Phase.WAITING:
+			var duration := int(GameState.shot_interval() * float(GameState.shots_per_round()))
+			_hud_timer.text  = "Round %d  —  %ds disponibili  —  premi START o SPAZIO" % [_round, duration]
+			_hud_shots.text  = ""
+			_hud_weapon.text = ""
+
 		Phase.SHOOTING:
 			var t       := maxi(0, int(ceil(_round_timer)))
 			var given   := GameState.shots_per_round() - _shots_to_give
@@ -351,7 +380,7 @@ func _update_hud() -> void:
 			var used    := given - ready
 			var coming  := _shots_to_give
 
-			_hud_timer.text = "⏱ %ds" % t
+			_hud_timer.text = "Round %d  ⏱ %ds" % [_round, t]
 
 			var parts: Array = []
 			if ready  > 0: parts.append("◉ %d armi" % ready)
@@ -371,6 +400,8 @@ func _update_hud() -> void:
 			_hud_timer.text  = ""
 			_hud_shots.text  = ""
 			_hud_weapon.text = ""
+
+	_hud_start.visible = (_phase == Phase.WAITING)
 
 func _show_flash(text: String, color: Color) -> void:
 	_hud_flash.text    = text

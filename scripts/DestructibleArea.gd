@@ -98,6 +98,7 @@ var _vfx:         Array = []
 
 var _placed_weapons: Array = []
 var _shots_last:     int   = -1
+var _active_rows:    int   = ROWS
 
 var _label: Label
 
@@ -196,6 +197,9 @@ func _rebuild_row(row: int) -> void:
 
 # ── Modalità colore ───────────────────────────────────────────────────────────
 
+func set_active_rows(n: int) -> void:
+	_active_rows = clampi(n, 1, ROWS)
+
 func init_noise(seed_val: int = -1) -> void:
 	if seed_val < 0:
 		seed_val = randi()
@@ -206,11 +210,16 @@ func init_noise(seed_val: int = -1) -> void:
 	var hp_m := GameState.terrain_hp_mult()
 	for row: int in ROWS:
 		for col: int in COLS:
+			var idx := row * COLS + col
+			if row >= _active_rows:
+				_base_col[idx] = Color(0.0, 0.0, 0.0, 0.0)
+				_max_hp[idx]   = 0.0
+				_hp[idx]       = 0.0
+				continue
 			var n:     float = (noise.get_noise_2d(col, row) + 1.0) / 2.0
 			var depth: float = float(row) / ROWS
 			var t:     float = clampf(n * 0.45 + depth * 0.65, 0.0, 1.0)
 			_set_mat(col, row, int(t * PALETTE.size()))
-			var idx := row * COLS + col
 			_hp[idx]     = _max_hp[idx] * hp_m
 			_max_hp[idx] = _hp[idx]
 	if _img:

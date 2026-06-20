@@ -31,6 +31,14 @@ func _ready() -> void:
 	_setup_walls()
 	_spawn_balls()
 	_add_boundary_visuals()
+	_add_terrain()
+
+# ── Terrain distruttibile ─────────────────────────────────────────────────────
+
+func _add_terrain() -> void:
+	var terrain := DestructibleArea.new()
+	terrain.position = Vector2(0.0, TOP_H)
+	add_child(terrain)
 
 # ── Background ────────────────────────────────────────────────────────────────
 

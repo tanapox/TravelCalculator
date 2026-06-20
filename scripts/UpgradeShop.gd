@@ -1,6 +1,8 @@
 class_name UpgradeShop
 extends CanvasLayer
 
+signal shop_closed
+
 # ── Layout albero ─────────────────────────────────────────────────────────────
 # Posizione di ogni card: Vector2(MARGIN_X + grid_x * CELL_W, HEADER_Y + grid_y * CELL_H)
 
@@ -295,6 +297,8 @@ func toggle() -> void:
 	if _visible_flag:
 		_refresh_header()
 		_refresh_all_cards()
+	else:
+		shop_closed.emit()
 
 func show_notif(msg: String) -> void:
 	_notif_lbl.text    = msg

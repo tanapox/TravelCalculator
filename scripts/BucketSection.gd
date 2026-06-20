@@ -208,7 +208,7 @@ func _on_ball_in_slot(body: Node2D, slot_idx: int) -> void:
 	_money_label.text = "$ %d" % GameState.money
 
 	var slot_cx := slot_idx * _slot_w + _slot_w * 0.5
-	var col     := _slot_colors[slot_idx] if slot_idx < _slot_colors.size() else Color.WHITE
+	var col: Color = _slot_colors[slot_idx] if slot_idx < _slot_colors.size() else Color.WHITE
 	_spawn_float_text("+%d" % earned, Vector2(slot_cx, SLOT_Y - 10.0), col.lightened(0.4))
 
 	ball.call_deferred("queue_free")

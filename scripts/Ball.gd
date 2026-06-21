@@ -6,16 +6,22 @@ var ball_color:  Color = Color.RED
 var money_value: int   = 10
 var collected:   bool  = false
 
-const MIN_SPEED: float = 120.0
+const BOUNCE_START:      float = 1.0   # rimbalzo iniziale
+const BOUNCE_END:        float = 0.15  # rimbalzo minimo (non raggiunge zero)
+const BOUNCE_DECAY_TIME: float = 18.0  # secondi per passare da START a END
+
+var _elapsed: float = 0.0
 
 func setup(r: float, c: Color, m_val: int = 10) -> void:
 	radius      = r
 	ball_color  = c
 	money_value = m_val
 
+	linear_damp  = 0.25   # lieve attrito dell'aria
+
 	var mat := PhysicsMaterial.new()
-	mat.bounce   = 1.0
-	mat.friction = 0.0
+	mat.bounce   = BOUNCE_START
+	mat.friction = 0.05
 	physics_material_override = mat
 
 	var cshape := CollisionShape2D.new()
@@ -27,12 +33,12 @@ func setup(r: float, c: Color, m_val: int = 10) -> void:
 	linear_velocity = Vector2(randf_range(-280.0, 280.0), randf_range(-180.0, 60.0))
 	queue_redraw()
 
-func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
+func _physics_process(delta: float) -> void:
 	if collected:
 		return
-	if state.linear_velocity.length_squared() < MIN_SPEED * MIN_SPEED:
-		var angle := randf() * TAU
-		state.linear_velocity = Vector2(cos(angle), sin(angle)) * MIN_SPEED
+	_elapsed += delta
+	var t := minf(_elapsed / BOUNCE_DECAY_TIME, 1.0)
+	physics_material_override.bounce = lerpf(BOUNCE_START, BOUNCE_END, t)
 
 func _draw() -> void:
 	draw_circle(Vector2(3.0, 5.0), radius * 0.95, Color(0.0, 0.0, 0.0, 0.22))

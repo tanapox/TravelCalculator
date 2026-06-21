@@ -345,13 +345,11 @@ func _draw() -> void:
 		draw_string(font, Vector2(float(AREA_W - LAUNCHER_W), cy), txt,
 		            HORIZONTAL_ALIGNMENT_CENTER, float(LAUNCHER_W),   28, Color(1.0, 0.88, 0.2))
 	for pw in _placed_weapons:
-		var cx: float  = float(LAUNCHER_W) * 0.5 if not pw.from_right \
-		                 else float(AREA_W) - float(LAUNCHER_W) * 0.5
-		var cy: float  = float(pw.panel_y)
-		var col: Color = WEAPONS[pw.weapon].color
-		draw_circle(Vector2(cx, cy), 16.0, col.darkened(0.5))
-		draw_circle(Vector2(cx, cy), 11.0, col)
-		draw_circle(Vector2(cx, cy), 5.0,  col.lightened(0.6))
+		var cp: Vector2 = Vector2(float(pw.panel_x), float(pw.panel_y))
+		var col: Color  = WEAPONS[pw.weapon].color
+		draw_circle(cp, 16.0, col.darkened(0.5))
+		draw_circle(cp, 11.0, col)
+		draw_circle(cp, 5.0,  col.lightened(0.6))
 
 func _draw_launcher_panel(rect: Rect2) -> void:
 	draw_rect(rect, Color(0.13, 0.13, 0.16))
@@ -381,7 +379,7 @@ func _process(delta: float) -> void:
 		pw.timer -= delta
 		if pw.timer <= 0.0:
 			pw.timer += float(WEAPONS[pw.weapon].rate)
-			_launch_from_panel(float(pw.panel_y), bool(pw.from_right), pw.weapon)
+			_launch_from_panel(float(pw.panel_x), float(pw.panel_y), pw.weapon)
 		need_overlay = true
 
 	for worm in _worms:
@@ -457,6 +455,7 @@ func _input(event: InputEvent) -> void:
 			shots_available -= 1
 			weapon_fired.emit()
 			_placed_weapons.append({
+				"panel_x":    local.x,
 				"panel_y":    local.y,
 				"from_right": in_right_panel,
 				"weapon":     current_weapon,
@@ -491,12 +490,8 @@ func _launch(target: Vector2, weapon: Weapon) -> void:
 		"weapon": weapon,
 	})
 
-func _launch_from_panel(panel_y: float, from_right: bool, weapon: Weapon) -> void:
-	var launcher: Vector2
-	if from_right:
-		launcher = Vector2(float(AREA_W) - float(LAUNCHER_W) * 0.5, panel_y)
-	else:
-		launcher = Vector2(float(LAUNCHER_W) * 0.5, panel_y)
+func _launch_from_panel(panel_x: float, panel_y: float, weapon: Weapon) -> void:
+	var launcher := Vector2(panel_x, panel_y)
 	var tx: float  = randf_range(float(GRID_X) + float(CELL) * 3,
 	                             float(AREA_W - LAUNCHER_W) - float(CELL) * 3)
 	var ty: float  = randf_range(float(TERRAIN_Y), float(TERRAIN_Y) + float(_active_rows * CELL))

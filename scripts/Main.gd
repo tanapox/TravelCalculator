@@ -318,6 +318,9 @@ func _start_collecting() -> void:
 	_collect_timer = 20.0
 	_terrain.stop_firing()
 	_remove_barrier()
+	for b in _balls:
+		if is_instance_valid(b):
+			(b as Ball).start_falling()
 	_show_flash("RACCOLTA!", Color(0.4, 1.0, 0.5))
 	_update_hud()
 

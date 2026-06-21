@@ -21,8 +21,11 @@ var UPGRADES: Array = []
 # Soglie cumulative per i livelli 2..100; indice 0 = soglia livello 2
 var _thresholds: Array = []
 
-# Numero massimo di righe del terreno distruttibile (letto da levels.cfg)
+# Numero massimo assoluto di righe (dimensione array, da [terrain] rows)
 var terrain_rows: int = 20
+
+# Righe attive per ogni livello giocatore; indice 0 = livello 1
+var _terrain_rows_by_level: Array = []
 
 # ── Init ──────────────────────────────────────────────────────────────────────
 
@@ -59,6 +62,13 @@ func _load_levels() -> void:
 		_fallback_thresholds()
 		return
 	terrain_rows = int(cfg.get_value("terrain", "rows", 20))
+	_terrain_rows_by_level = []
+	for lvl in range(1, 101):
+		var key := "l%d" % lvl
+		var val = cfg.get_value("terrain_rows", key, null)
+		if val == null:
+			break
+		_terrain_rows_by_level.append(int(val))
 	_thresholds = []
 	for lvl in range(2, 101):
 		var key := "l%d" % lvl
@@ -73,6 +83,12 @@ func _fallback_thresholds() -> void:
 	_thresholds = []
 	for n in range(1, 100):
 		_thresholds.append(500 * n * (n + 1))
+
+func terrain_rows_at_level(lvl: int) -> int:
+	if _terrain_rows_by_level.is_empty():
+		return clampi(lvl, 1, terrain_rows)
+	var idx := clampi(lvl - 1, 0, _terrain_rows_by_level.size() - 1)
+	return int(_terrain_rows_by_level[idx])
 
 # ── API pubblica ──────────────────────────────────────────────────────────────
 

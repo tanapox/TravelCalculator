@@ -9,6 +9,7 @@ const AREA_W:     int = 1280
 const AREA_H:     int = 240
 const GRID_X:     int = LAUNCHER_W                             # x dove inizia la griglia
 const COLS:       int = (AREA_W - LAUNCHER_W * 2) / CELL      # 280
+const TERRAIN_Y:  int = AREA_H / 2                            # y da cui parte il terreno (120)
 var   ROWS:       int = 20   # letto da GameState.terrain_rows in _ready()
 
 const LEFT_LAUNCHER:  Vector2 = Vector2(40.0,  120.0)
@@ -121,7 +122,7 @@ func _ready() -> void:
 	_tex             = ImageTexture.create_from_image(_img)
 	_sprite          = Sprite2D.new()
 	_sprite.centered = false
-	_sprite.position = Vector2(GRID_X, 0.0)
+	_sprite.position = Vector2(GRID_X, float(TERRAIN_Y))
 	_sprite.z_index  = 1
 	_sprite.texture  = _tex
 	_sprite.region_enabled = true
@@ -134,7 +135,7 @@ func _ready() -> void:
 	add_child(_overlay)
 
 	_label = Label.new()
-	_label.position = Vector2(GRID_X + 8.0, 4.0)
+	_label.position = Vector2(GRID_X + 8.0, float(TERRAIN_Y) + 4.0)
 	_label.add_theme_font_size_override("font_size", 13)
 	_label.add_theme_color_override("font_color", Color(1.0, 1.0, 0.55, 0.92))
 	_label.z_index = 10
@@ -192,7 +193,7 @@ func _rebuild_row(row: int) -> void:
 
 		var span_w   := float(end_col - start_col) * CELL
 		var center_x := GRID_X + float(start_col + end_col) * 0.5 * CELL
-		var center_y := float(row) * CELL + CELL * 0.5
+		var center_y := float(TERRAIN_Y) + float(row) * CELL + CELL * 0.5
 
 		var cs   := CollisionShape2D.new()
 		var rect := RectangleShape2D.new()
@@ -492,7 +493,7 @@ func _launch_from_panel(panel_y: float, from_right: bool, weapon: Weapon) -> voi
 		launcher = Vector2(float(LAUNCHER_W) * 0.5, panel_y)
 	var tx: float  = randf_range(float(GRID_X) + float(CELL) * 3,
 	                             float(AREA_W - LAUNCHER_W) - float(CELL) * 3)
-	var ty: float  = randf_range(float(CELL) * 2, float(AREA_H) - float(CELL) * 2)
+	var ty: float  = randf_range(float(TERRAIN_Y), float(TERRAIN_Y) + float(_active_rows * CELL))
 	var spd: float = float(WEAPONS[weapon].speed) * GameState.projectile_speed_mult()
 	_projectiles.append({
 		"start":  launcher,
@@ -607,10 +608,10 @@ func _dmg_idx(idx: int, amount: float) -> void:
 # ── Coordinate ────────────────────────────────────────────────────────────────
 
 func _local_to_cell(local: Vector2) -> Vector2i:
-	return Vector2i(int((local.x - GRID_X) / CELL), int(local.y / CELL))
+	return Vector2i(int((local.x - GRID_X) / CELL), int((local.y - float(TERRAIN_Y)) / CELL))
 
 func _cell_to_local(col: int, row: int) -> Vector2:
-	return Vector2(GRID_X + col * CELL + CELL * 0.5, row * CELL + CELL * 0.5)
+	return Vector2(GRID_X + col * CELL + CELL * 0.5, float(TERRAIN_Y) + row * CELL + CELL * 0.5)
 
 func _in_bounds(col: int, row: int) -> bool:
 	return col >= 0 and col < COLS and row >= 0 and row < ROWS

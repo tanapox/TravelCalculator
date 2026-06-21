@@ -8,8 +8,8 @@ var collected:   bool  = false
 var _falling:    bool  = false
 
 const BOUNCE_START: float = 1.0
-const BOUNCE_END:   float = 0.10
-const BOUNCE_STEP:  float = 0.09  # decremento per ogni rimbalzo (~10 rimbalzi per fermarsi)
+const BOUNCE_END:   float = 0.0
+const BOUNCE_STEP:  float = 0.22  # decremento per ogni rimbalzo (~5 rimbalzi per fermarsi)
 
 func setup(r: float, c: Color, m_val: int = 10) -> void:
 	radius      = r
@@ -44,7 +44,7 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 		var b := physics_material_override.bounce
 		physics_material_override.bounce = maxf(BOUNCE_END, b - BOUNCE_STEP)
 		if _falling:
-			state.linear_velocity.x += randf_range(-18.0, 18.0)
+			state.linear_velocity.x += randf_range(-6.0, 6.0)
 
 func _draw() -> void:
 	draw_circle(Vector2(3.0, 5.0), radius * 0.95, Color(0.0, 0.0, 0.0, 0.22))

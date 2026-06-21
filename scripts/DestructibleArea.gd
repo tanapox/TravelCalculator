@@ -334,8 +334,8 @@ func _draw_cell(col: int, row: int) -> void:
 # ── _draw: pannelli laterali (z sotto la texture) ────────────────────────────
 
 func _draw() -> void:
-	_draw_launcher_panel(LEFT_LAUNCHER,  Rect2(0,              0, LAUNCHER_W, AREA_H), true)
-	_draw_launcher_panel(RIGHT_LAUNCHER, Rect2(AREA_W - LAUNCHER_W, 0, LAUNCHER_W, AREA_H), false)
+	_draw_launcher_panel(Rect2(0,                    0, LAUNCHER_W, AREA_H))
+	_draw_launcher_panel(Rect2(AREA_W - LAUNCHER_W, 0, LAUNCHER_W, AREA_H))
 	if shots_available > 0:
 		var font: Font = ThemeDB.fallback_font
 		var txt: String = "×%d" % shots_available
@@ -353,24 +353,8 @@ func _draw() -> void:
 		draw_circle(Vector2(cx, cy), 11.0, col)
 		draw_circle(Vector2(cx, cy), 5.0,  col.lightened(0.6))
 
-func _draw_launcher_panel(center: Vector2, rect: Rect2, faces_right: bool) -> void:
+func _draw_launcher_panel(rect: Rect2) -> void:
 	draw_rect(rect, Color(0.13, 0.13, 0.16))
-	for corner in [rect.position + Vector2(10, 10),
-				   rect.position + Vector2(rect.size.x - 10, 10),
-				   rect.position + Vector2(10, rect.size.y - 10),
-				   rect.position + Vector2(rect.size.x - 10, rect.size.y - 10)]:
-		draw_circle(corner, 5.0, Color(0.25, 0.25, 0.28))
-		draw_circle(corner, 3.0, Color(0.35, 0.35, 0.38))
-	var barrel_w := 32.0
-	var barrel_h := 14.0
-	var bx := center.x + (6.0 if faces_right else -barrel_w - 6.0)
-	draw_rect(Rect2(bx, center.y - barrel_h * 0.5, barrel_w, barrel_h), Color(0.30, 0.30, 0.35))
-	draw_rect(Rect2(bx, center.y - barrel_h * 0.5, barrel_w, 2), Color(0.40, 0.40, 0.45))
-	draw_circle(center, 24.0, Color(0.18, 0.18, 0.21))
-	draw_circle(center, 20.0, Color(0.26, 0.26, 0.30))
-	draw_circle(center, 12.0, Color(0.38, 0.38, 0.43))
-	draw_circle(center, 7.0,  WEAPONS[current_weapon].color)
-	draw_circle(center, 3.5,  WEAPONS[current_weapon].color.lightened(0.5))
 
 
 # ── Process ───────────────────────────────────────────────────────────────────

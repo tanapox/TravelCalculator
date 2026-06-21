@@ -41,17 +41,20 @@ func start_falling() -> void:
 	_settled = false
 	physics_material_override.bounce = BOUNCE_START
 
+const BUCKET_Y: float = 480.0   # world y dove inizia la zona pin (TOP_H * 2)
+
 func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 	if collected:
 		return
-	if _settled:
+	var in_bucket := global_position.y >= BUCKET_Y
+	if _settled and not in_bucket:
 		if state.linear_velocity.length_squared() < 400.0:
 			state.linear_velocity = Vector2.ZERO
 			state.angular_velocity = 0.0
 		else:
 			state.linear_velocity.x *= 0.90
 		return
-	if _falling and state.get_contact_count() > 0:
+	if _falling and state.get_contact_count() > 0 and not in_bucket:
 		var b := physics_material_override.bounce
 		physics_material_override.bounce = maxf(BOUNCE_END, b - BOUNCE_STEP)
 		state.linear_velocity.x += randf_range(-6.0, 6.0)

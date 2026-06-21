@@ -59,6 +59,8 @@ var _hud_shots:    Label
 var _hud_weapon:   Label
 var _hud_flash:    Label
 var _hud_start:    Control
+var _hud_upgrade:  Control
+var _hud_run:      Control
 
 # ── Init ──────────────────────────────────────────────────────────────────────
 
@@ -222,6 +224,16 @@ func _build_hud() -> void:
 
 	_hud.add_child(_hud_start)
 
+	# Pulsante UPGRADE
+	_hud_upgrade = _make_hud_button(
+		Vector2(360.0, 360.0), Vector2(260.0, 72.0),
+		"UPGRADE", Color(0.18, 0.10, 0.58), Color(0.38, 0.28, 0.90))
+
+	# Pulsante RUN
+	_hud_run = _make_hud_button(
+		Vector2(660.0, 360.0), Vector2(260.0, 72.0),
+		"RUN", Color(0.06, 0.42, 0.14), Color(0.18, 0.90, 0.32))
+
 # ── Sbarra ────────────────────────────────────────────────────────────────────
 
 func _create_barrier() -> void:
@@ -326,13 +338,12 @@ func _start_collecting() -> void:
 
 func _end_round() -> void:
 	_phase = Phase.BETWEEN_ROUNDS
-	_clear_balls()
 	_show_flash("Round %d completato!" % _round, Color(0.8, 0.6, 1.0))
-	_shop.toggle()   # apre negozio automaticamente
+	_update_hud()
 
 func _on_shop_closed() -> void:
 	if _phase == Phase.BETWEEN_ROUNDS:
-		_start_round()
+		_update_hud()   # torna ai bottoni senza avviare il round
 
 # ── Segnali ───────────────────────────────────────────────────────────────────
 
@@ -349,17 +360,28 @@ func _on_level_up(new_level: int) -> void:
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT \
-			and event.pressed and _phase == Phase.WAITING:
+			and event.pressed:
 		var pos: Vector2 = (event as InputEventMouse).position
-		if Rect2(490.0, 380.0, 300.0, 72.0).has_point(pos):
-			_begin_shooting()
-			return
+		if _phase == Phase.WAITING:
+			if Rect2(490.0, 380.0, 300.0, 72.0).has_point(pos):
+				_begin_shooting()
+				return
+		elif _phase == Phase.BETWEEN_ROUNDS:
+			if Rect2(360.0, 360.0, 260.0, 72.0).has_point(pos):
+				_shop.toggle()
+				return
+			if Rect2(660.0, 360.0, 260.0, 72.0).has_point(pos):
+				_start_round()
+				return
 
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE:
 			get_tree().quit()
 		elif event.keycode == KEY_SPACE:
-			_begin_shooting()
+			if _phase == Phase.WAITING:
+				_begin_shooting()
+			elif _phase == Phase.BETWEEN_ROUNDS:
+				_start_round()
 		elif event.keycode == KEY_F11:
 			var win := get_window()
 			win.mode = Window.MODE_WINDOWED if win.mode == Window.MODE_FULLSCREEN \
@@ -398,7 +420,7 @@ func _process(delta: float) -> void:
 
 		Phase.COLLECTING:
 			_collect_timer -= delta
-			if _count_active_balls() == 0 or _collect_timer <= 0.0:
+			if _all_balls_done() or _collect_timer <= 0.0:
 				_end_round()
 
 # ── HUD ───────────────────────────────────────────────────────────────────────
@@ -435,11 +457,41 @@ func _update_hud() -> void:
 			_hud_weapon.text = ""
 
 		Phase.BETWEEN_ROUNDS:
-			_hud_timer.text  = ""
+			_hud_timer.text  = "Round %d completato  —  SPAZIO per avviare" % _round
 			_hud_shots.text  = ""
 			_hud_weapon.text = ""
 
-	_hud_start.visible = (_phase == Phase.WAITING)
+	_hud_start.visible   = (_phase == Phase.WAITING)
+	_hud_upgrade.visible = (_phase == Phase.BETWEEN_ROUNDS)
+	_hud_run.visible     = (_phase == Phase.BETWEEN_ROUNDS)
+
+func _make_hud_button(pos: Vector2, sz: Vector2, label: String,
+		bg_color: Color, top_color: Color) -> Control:
+	var ctrl := Control.new()
+	ctrl.position = pos
+	ctrl.size     = sz
+	ctrl.visible  = false
+	var bg := ColorRect.new(); bg.size = sz; bg.color = bg_color
+	ctrl.add_child(bg)
+	var top := ColorRect.new(); top.size = Vector2(sz.x, 3.0); top.color = top_color
+	ctrl.add_child(top)
+	var lbl := Label.new()
+	lbl.position = Vector2(0.0, 18.0); lbl.size = Vector2(sz.x, 40.0)
+	lbl.text = label; lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.add_theme_font_size_override("font_size", 26)
+	lbl.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0))
+	ctrl.add_child(lbl)
+	_hud.add_child(ctrl)
+	return ctrl
+
+func _all_balls_done() -> bool:
+	for b in _balls:
+		if not is_instance_valid(b):
+			continue
+		var ball := b as Ball
+		if not ball.collected and not ball.sleeping:
+			return false
+	return true
 
 func _show_flash(text: String, color: Color) -> void:
 	_hud_flash.text    = text

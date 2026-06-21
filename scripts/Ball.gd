@@ -12,8 +12,8 @@ func setup(r: float, c: Color, m_val: int = 10) -> void:
 	money_value = m_val
 
 	var mat := PhysicsMaterial.new()
-	mat.bounce   = randf_range(0.65, 0.90)
-	mat.friction = 0.04
+	mat.bounce   = randf_range(0.80, 0.95)
+	mat.friction = 0.01
 	physics_material_override = mat
 
 	var cshape := CollisionShape2D.new()
@@ -24,6 +24,15 @@ func setup(r: float, c: Color, m_val: int = 10) -> void:
 
 	linear_velocity = Vector2(randf_range(-280.0, 280.0), randf_range(-200.0, 80.0))
 	queue_redraw()
+
+const MIN_SPEED: float = 100.0
+
+func _physics_process(_delta: float) -> void:
+	if collected:
+		return
+	if linear_velocity.length_squared() < MIN_SPEED * MIN_SPEED:
+		var dir := Vector2(randf_range(-1.0, 1.0), randf_range(0.2, 1.0)).normalized()
+		linear_velocity = dir * MIN_SPEED
 
 func _draw() -> void:
 	draw_circle(Vector2(3.0, 5.0), radius * 0.95, Color(0.0, 0.0, 0.0, 0.22))

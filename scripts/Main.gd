@@ -38,6 +38,7 @@ var _shot_timer:     float = 0.0   # conto alla rovescia fino alla prossima arma
 var _shots_to_give:  int   = 0     # armi ancora da sbloccare questo round
 var _shots_total:    int   = 0     # armi totali del round corrente
 var _collect_timer:  float = 0.0   # timeout raccolta palline
+var _settling_time:  float = 0.0   # secondi consecutivi in cui tutte le palline sono ferme
 
 var _flash_text:     String = ""
 var _flash_timer:    float  = 0.0
@@ -328,6 +329,7 @@ func _begin_shooting() -> void:
 func _start_collecting() -> void:
 	_phase = Phase.COLLECTING
 	_collect_timer = 8.0
+	_settling_time = 0.0
 	_terrain.stop_firing()
 	_remove_barrier()
 	for b in _balls:
@@ -418,7 +420,13 @@ func _process(delta: float) -> void:
 
 		Phase.COLLECTING:
 			_collect_timer -= delta
-			if _all_balls_done() or _collect_timer <= 0.0:
+			if _all_balls_done():
+				_settling_time += delta
+				if _settling_time >= 1.0:
+					_end_round()
+			else:
+				_settling_time = 0.0
+			if _collect_timer <= 0.0:
 				_end_round()
 
 # ── HUD ───────────────────────────────────────────────────────────────────────

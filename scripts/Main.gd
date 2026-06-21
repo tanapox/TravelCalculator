@@ -36,6 +36,7 @@ var _round:          int   = 0
 var _round_timer:    float = 0.0   # conto alla rovescia totale del round
 var _shot_timer:     float = 0.0   # conto alla rovescia fino alla prossima arma
 var _shots_to_give:  int   = 0     # armi ancora da sbloccare questo round
+var _shots_total:    int   = 0     # armi totali del round corrente
 var _collect_timer:  float = 0.0   # timeout raccolta palline
 
 var _flash_text:     String = ""
@@ -292,11 +293,13 @@ func _start_round() -> void:
 func _begin_shooting() -> void:
 	if _phase != Phase.WAITING:
 		return
-	var interval := GameState.shot_interval()
-	var shots    := GameState.shots_per_round()
-	_round_timer   = interval * float(shots)
+	var interval  := GameState.shot_interval()
+	var duration  := float(GameState.round_duration_at_level(GameState.level))
+	var shots     := maxi(1, int(duration / interval))
+	_round_timer   = duration
 	_shot_timer    = interval
 	_shots_to_give = shots - 1
+	_shots_total   = shots
 	_terrain.shots_available = 1
 
 	_phase = Phase.SHOOTING
@@ -393,14 +396,14 @@ func _process(delta: float) -> void:
 func _update_hud() -> void:
 	match _phase:
 		Phase.WAITING:
-			var duration := int(GameState.shot_interval() * float(GameState.shots_per_round()))
+			var duration := GameState.round_duration_at_level(GameState.level)
 			_hud_timer.text  = "Round %d  —  %ds disponibili  —  premi START o SPAZIO" % [_round, duration]
 			_hud_shots.text  = ""
 			_hud_weapon.text = ""
 
 		Phase.SHOOTING:
 			var t       := maxi(0, int(ceil(_round_timer)))
-			var given   := GameState.shots_per_round() - _shots_to_give
+			var given   := _shots_total - _shots_to_give
 			var ready   := _terrain.shots_available
 			var used    := given - ready
 			var coming  := _shots_to_give

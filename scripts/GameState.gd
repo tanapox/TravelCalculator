@@ -22,10 +22,13 @@ var UPGRADES: Array = []
 var _thresholds: Array = []
 
 # Numero massimo assoluto di righe (dimensione array, da [terrain] rows)
-var terrain_rows: int = 20
+var terrain_rows: int = 30
 
 # Righe attive per ogni livello giocatore; indice 0 = livello 1
 var _terrain_rows_by_level: Array = []
+
+# Durata round (secondi) per ogni livello giocatore; indice 0 = livello 1
+var _timers_by_level: Array = []
 
 # ── Init ──────────────────────────────────────────────────────────────────────
 
@@ -61,7 +64,7 @@ func _load_levels() -> void:
 		push_warning("GameState: impossibile caricare data/levels.cfg — uso formula predefinita")
 		_fallback_thresholds()
 		return
-	terrain_rows = int(cfg.get_value("terrain", "rows", 20))
+	terrain_rows = int(cfg.get_value("terrain", "rows", 30))
 	_terrain_rows_by_level = []
 	for lvl in range(1, 101):
 		var key := "l%d" % lvl
@@ -69,6 +72,13 @@ func _load_levels() -> void:
 		if val == null:
 			break
 		_terrain_rows_by_level.append(int(val))
+	_timers_by_level = []
+	for lvl in range(1, 101):
+		var key := "l%d" % lvl
+		var val = cfg.get_value("timer", key, null)
+		if val == null:
+			break
+		_timers_by_level.append(int(val))
 	_thresholds = []
 	for lvl in range(2, 101):
 		var key := "l%d" % lvl
@@ -89,6 +99,12 @@ func terrain_rows_at_level(lvl: int) -> int:
 		return clampi(lvl, 1, terrain_rows)
 	var idx := clampi(lvl - 1, 0, _terrain_rows_by_level.size() - 1)
 	return int(_terrain_rows_by_level[idx])
+
+func round_duration_at_level(lvl: int) -> int:
+	if _timers_by_level.is_empty():
+		return 10 + clampi(lvl - 1, 0, 50)
+	var idx := clampi(lvl - 1, 0, _timers_by_level.size() - 1)
+	return int(_timers_by_level[idx])
 
 # ── API pubblica ──────────────────────────────────────────────────────────────
 

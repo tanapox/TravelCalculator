@@ -9,7 +9,7 @@ const AREA_W:     int = 1280
 const AREA_H:     int = 240
 const GRID_X:     int = LAUNCHER_W                             # x dove inizia la griglia
 const COLS:       int = (AREA_W - LAUNCHER_W * 2) / CELL      # 280
-const ROWS:       int = AREA_H / CELL                          # 60
+var   ROWS:       int = 20   # letto da GameState.terrain_rows in _ready()
 
 const LEFT_LAUNCHER:  Vector2 = Vector2(40.0,  120.0)
 const RIGHT_LAUNCHER: Vector2 = Vector2(1240.0, 120.0)
@@ -98,13 +98,15 @@ var _vfx:         Array = []
 
 var _placed_weapons: Array = []
 var _shots_last:     int   = -1
-var _active_rows:    int   = ROWS
+var _active_rows:    int   = 0
 
 var _label: Label
 
 # ── Init ──────────────────────────────────────────────────────────────────────
 
 func _ready() -> void:
+	ROWS         = GameState.terrain_rows
+	_active_rows = ROWS
 	_hp       = PackedFloat32Array(); _hp.resize(COLS * ROWS)
 	_max_hp   = PackedFloat32Array(); _max_hp.resize(COLS * ROWS)
 	_base_col = PackedColorArray();   _base_col.resize(COLS * ROWS)

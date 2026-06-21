@@ -21,6 +21,9 @@ var UPGRADES: Array = []
 # Soglie cumulative per i livelli 2..100; indice 0 = soglia livello 2
 var _thresholds: Array = []
 
+# Numero massimo di righe del terreno distruttibile (letto da levels.cfg)
+var terrain_rows: int = 20
+
 # ── Init ──────────────────────────────────────────────────────────────────────
 
 func _ready() -> void:
@@ -55,6 +58,7 @@ func _load_levels() -> void:
 		push_warning("GameState: impossibile caricare data/levels.cfg — uso formula predefinita")
 		_fallback_thresholds()
 		return
+	terrain_rows = int(cfg.get_value("terrain", "rows", 20))
 	_thresholds = []
 	for lvl in range(2, 101):
 		var key := "l%d" % lvl

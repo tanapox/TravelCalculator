@@ -38,6 +38,8 @@ func setup(r: float, c: Color, m_val: int = 10) -> void:
 
 func start_falling() -> void:
 	_falling = true
+	_settled = false
+	physics_material_override.bounce = BOUNCE_START
 
 func _physics_process(_delta: float) -> void:
 	if collected or _settled:
@@ -52,11 +54,10 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 		state.linear_velocity = Vector2.ZERO
 		state.angular_velocity = 0.0
 		return
-	if state.get_contact_count() > 0:
+	if _falling and state.get_contact_count() > 0:
 		var b := physics_material_override.bounce
 		physics_material_override.bounce = maxf(BOUNCE_END, b - BOUNCE_STEP)
-		if _falling:
-			state.linear_velocity.x += randf_range(-6.0, 6.0)
+		state.linear_velocity.x += randf_range(-6.0, 6.0)
 		if physics_material_override.bounce <= BOUNCE_END:
 			_settle()
 			state.linear_velocity = Vector2.ZERO

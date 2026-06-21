@@ -262,7 +262,7 @@ func _clear_balls() -> void:
 	_balls = []
 
 func _spawn_balls() -> void:
-	var count := randi_range(BALL_COUNT_MIN, BALL_COUNT_MAX)
+	var count := GameState.ball_count_at_level(GameState.level)
 	for _i in count:
 		var r         := randf_range(BALL_RADIUS_MIN, BALL_RADIUS_MAX)
 		var color_idx := randi() % BALL_COLORS.size()

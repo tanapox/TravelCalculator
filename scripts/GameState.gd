@@ -30,6 +30,9 @@ var _terrain_rows_by_level: Array = []
 # Durata round (secondi) per ogni livello giocatore; indice 0 = livello 1
 var _timers_by_level: Array = []
 
+# Numero di palline per ogni livello giocatore; indice 0 = livello 1
+var _balls_by_level: Array = []
+
 # ── Init ──────────────────────────────────────────────────────────────────────
 
 func _ready() -> void:
@@ -79,6 +82,13 @@ func _load_levels() -> void:
 		if val == null:
 			break
 		_timers_by_level.append(int(val))
+	_balls_by_level = []
+	for lvl in range(1, 101):
+		var key := "l%d" % lvl
+		var val = cfg.get_value("balls", key, null)
+		if val == null:
+			break
+		_balls_by_level.append(int(val))
 	_thresholds = []
 	for lvl in range(2, 101):
 		var key := "l%d" % lvl
@@ -99,6 +109,12 @@ func terrain_rows_at_level(lvl: int) -> int:
 		return clampi(lvl, 1, terrain_rows)
 	var idx := clampi(lvl - 1, 0, _terrain_rows_by_level.size() - 1)
 	return int(_terrain_rows_by_level[idx])
+
+func ball_count_at_level(lvl: int) -> int:
+	if _balls_by_level.is_empty():
+		return 10
+	var idx := clampi(lvl - 1, 0, _balls_by_level.size() - 1)
+	return int(_balls_by_level[idx])
 
 func round_duration_at_level(lvl: int) -> int:
 	if _timers_by_level.is_empty():

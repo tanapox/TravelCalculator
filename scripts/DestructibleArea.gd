@@ -16,8 +16,9 @@ const LEFT_LAUNCHER:  Vector2 = Vector2(40.0,  120.0)
 const RIGHT_LAUNCHER: Vector2 = Vector2(1240.0, 120.0)
 
 # ── Palette ───────────────────────────────────────────────────────────────────
+# Caricata da data/materials.cfg in _ready(). Struttura: [Color, hp:float, name:String]
 
-const PALETTE: Array = [
+var PALETTE: Array = [
 	[Color(0.95, 0.95, 0.92),  10.0,   "Gesso"],
 	[Color(0.85, 0.26, 0.26),  30.0,   "Mattone"],
 	[Color(0.88, 0.58, 0.14),  55.0,   "Arenaria"],
@@ -105,7 +106,23 @@ var _label: Label
 
 # ── Init ──────────────────────────────────────────────────────────────────────
 
+func _load_palette() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load("res://data/materials.cfg") != OK:
+		push_warning("DestructibleArea: materials.cfg non trovato — uso palette predefinita")
+		return
+	var loaded: Array = []
+	for section in cfg.get_sections():
+		var r: float = float(cfg.get_value(section, "color_r", 0.5))
+		var g: float = float(cfg.get_value(section, "color_g", 0.5))
+		var b: float = float(cfg.get_value(section, "color_b", 0.5))
+		var hp: float = float(cfg.get_value(section, "hp", 10.0))
+		loaded.append([Color(r, g, b), hp, section])
+	if loaded.size() > 0:
+		PALETTE = loaded
+
 func _ready() -> void:
+	_load_palette()
 	ROWS         = GameState.terrain_rows
 	_active_rows = ROWS
 	_hp       = PackedFloat32Array(); _hp.resize(COLS * ROWS)

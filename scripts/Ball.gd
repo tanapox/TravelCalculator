@@ -5,6 +5,7 @@ var radius:      float = 10.0
 var ball_color:  Color = Color.RED
 var money_value: int   = 10
 var collected:   bool  = false
+var _falling:    bool  = false
 
 const BOUNCE_START: float = 1.0
 const BOUNCE_END:   float = 0.10
@@ -16,7 +17,6 @@ func setup(r: float, c: Color, m_val: int = 10) -> void:
 	money_value = m_val
 
 	can_sleep             = false
-	gravity_scale         = 0.0   # immobile fino a start_falling()
 	contact_monitor       = true
 	max_contacts_reported = 4
 	linear_damp           = 0.25
@@ -35,7 +35,7 @@ func setup(r: float, c: Color, m_val: int = 10) -> void:
 	queue_redraw()
 
 func start_falling() -> void:
-	gravity_scale = 1.0
+	_falling = true
 
 func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 	if collected:
@@ -43,7 +43,8 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 	if state.get_contact_count() > 0:
 		var b := physics_material_override.bounce
 		physics_material_override.bounce = maxf(BOUNCE_END, b - BOUNCE_STEP)
-		state.linear_velocity.x += randf_range(-90.0, 90.0)
+		if _falling:
+			state.linear_velocity.x += randf_range(-18.0, 18.0)
 
 func _draw() -> void:
 	draw_circle(Vector2(3.0, 5.0), radius * 0.95, Color(0.0, 0.0, 0.0, 0.22))

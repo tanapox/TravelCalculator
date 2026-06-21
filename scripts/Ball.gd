@@ -17,6 +17,7 @@ func setup(r: float, c: Color, m_val: int = 10) -> void:
 	ball_color  = c
 	money_value = m_val
 
+	can_sleep    = false
 	linear_damp  = 0.25   # lieve attrito dell'aria
 
 	var mat := PhysicsMaterial.new()

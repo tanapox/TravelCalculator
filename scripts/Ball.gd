@@ -1,7 +1,7 @@
 class_name Ball
 extends RigidBody2D
 
-var radius:      float = 20.0
+var radius:      float = 10.0
 var ball_color:  Color = Color.RED
 var money_value: int   = 10
 var collected:   bool  = false
@@ -31,7 +31,6 @@ func setup(r: float, c: Color, m_val: int = 10) -> void:
 	cshape.shape  = circle
 	add_child(cshape)
 
-	linear_velocity = Vector2(randf_range(-280.0, 280.0), randf_range(-180.0, 60.0))
 	queue_redraw()
 
 func _physics_process(delta: float) -> void:

@@ -21,8 +21,8 @@ const BALL_COLORS: Array = [
 const BALL_VALUES: Array     = [10, 20, 15, 25, 30, 50, 35, 40]
 const BALL_COUNT_MIN: int    = 6
 const BALL_COUNT_MAX: int    = 14
-const BALL_RADIUS_MIN: float = 8.0
-const BALL_RADIUS_MAX: float = 22.0
+const BALL_RADIUS_MIN: float = 4.0
+const BALL_RADIUS_MAX: float = 11.0
 
 # ── Fasi del round ────────────────────────────────────────────────────────────
 

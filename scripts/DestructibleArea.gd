@@ -3,13 +3,13 @@ extends Node2D
 
 # ── Layout ────────────────────────────────────────────────────────────────────
 
-const CELL:       int = 4
+const CELL:       int = 2
 const LAUNCHER_W: int = 80
 const AREA_W:     int = 1280
 const AREA_H:     int = 240
 const GRID_X:     int = LAUNCHER_W                             # x dove inizia la griglia
-const COLS:       int = (AREA_W - LAUNCHER_W * 2) / CELL      # 280
-const TERRAIN_Y:  int = AREA_H / 2                            # y da cui parte il terreno (120)
+const COLS:       int = (AREA_W - LAUNCHER_W * 2) / CELL      # 560
+const TERRAIN_Y:  int = 40                                     # y da cui parte il terreno (240-100*2=40)
 var   ROWS:       int = 20   # letto da GameState.terrain_rows in _ready()
 
 const LEFT_LAUNCHER:  Vector2 = Vector2(40.0,  120.0)

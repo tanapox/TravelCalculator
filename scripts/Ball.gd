@@ -20,8 +20,8 @@ func setup(r: float, c: Color, m_val: int = 10) -> void:
 	can_sleep             = false
 	contact_monitor       = true
 	max_contacts_reported = 4
-	linear_damp           = 1.2
-	angular_damp          = 4.0
+	linear_damp           = 0.1
+	angular_damp          = 2.0
 
 	var mat := PhysicsMaterial.new()
 	mat.bounce   = BOUNCE_START

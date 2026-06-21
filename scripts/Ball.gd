@@ -6,10 +6,11 @@ var ball_color:  Color = Color.RED
 var money_value: int   = 10
 var collected:   bool  = false
 var _falling:    bool  = false
+var _settled:    bool  = false
 
 const BOUNCE_START: float = 1.0
 const BOUNCE_END:   float = 0.0
-const BOUNCE_STEP:  float = 0.22  # decremento per ogni rimbalzo (~5 rimbalzi per fermarsi)
+const BOUNCE_STEP:  float = 0.30  # bounce azzerato in ~4 rimbalzi
 
 func setup(r: float, c: Color, m_val: int = 10) -> void:
 	radius      = r
@@ -38,8 +39,18 @@ func setup(r: float, c: Color, m_val: int = 10) -> void:
 func start_falling() -> void:
 	_falling = true
 
+func _physics_process(_delta: float) -> void:
+	if collected or _settled:
+		return
+	if _falling and linear_velocity.length_squared() < 36.0:
+		_settle()
+
 func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 	if collected:
+		return
+	if _settled:
+		state.linear_velocity = Vector2.ZERO
+		state.angular_velocity = 0.0
 		return
 	if state.get_contact_count() > 0:
 		var b := physics_material_override.bounce
@@ -47,7 +58,13 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 		if _falling:
 			state.linear_velocity.x += randf_range(-6.0, 6.0)
 		if physics_material_override.bounce <= BOUNCE_END:
-			state.linear_velocity *= 0.65
+			_settle()
+			state.linear_velocity = Vector2.ZERO
+			state.angular_velocity = 0.0
+
+func _settle() -> void:
+	_settled = true
+	physics_material_override.bounce = 0.0
 
 func _draw() -> void:
 	draw_circle(Vector2(3.0, 5.0), radius * 0.95, Color(0.0, 0.0, 0.0, 0.22))

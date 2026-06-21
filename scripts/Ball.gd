@@ -40,6 +40,12 @@ func _physics_process(delta: float) -> void:
 	var t := minf(_elapsed / BOUNCE_DECAY_TIME, 1.0)
 	physics_material_override.bounce = lerpf(BOUNCE_START, BOUNCE_END, t)
 
+func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
+	if collected:
+		return
+	if state.get_contact_count() > 0:
+		state.linear_velocity.x += randf_range(-90.0, 90.0)
+
 func _draw() -> void:
 	draw_circle(Vector2(3.0, 5.0), radius * 0.95, Color(0.0, 0.0, 0.0, 0.22))
 	draw_circle(Vector2.ZERO, radius, ball_color)

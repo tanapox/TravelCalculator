@@ -317,14 +317,7 @@ func _start_collecting() -> void:
 	_phase = Phase.COLLECTING
 	_collect_timer = 20.0
 	_terrain.stop_firing()
-	_terrain.disable_all_physics()
 	_remove_barrier()
-	# Spinta verso il basso per le palline con velocità verticale troppo bassa
-	for b in _balls:
-		if is_instance_valid(b):
-			var v: Vector2 = (b as RigidBody2D).linear_velocity
-			if v.y < 150.0:
-				(b as RigidBody2D).linear_velocity = Vector2(v.x, 150.0)
 	_show_flash("RACCOLTA!", Color(0.4, 1.0, 0.5))
 	_update_hud()
 

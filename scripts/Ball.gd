@@ -6,14 +6,18 @@ var ball_color:  Color = Color.RED
 var money_value: int   = 10
 var collected:   bool  = false
 
+const MIN_SPEED: float = 120.0
+
 func setup(r: float, c: Color, m_val: int = 10) -> void:
 	radius      = r
 	ball_color  = c
 	money_value = m_val
 
 	var mat := PhysicsMaterial.new()
-	mat.bounce   = randf_range(0.80, 0.95)
-	mat.friction = 0.01
+	mat.bounce              = 0.92
+	mat.bounce_combine_mode = PhysicsMaterial.COMBINE_MAX  # vince sempre il valore più alto
+	mat.friction              = 0.0
+	mat.friction_combine_mode = PhysicsMaterial.COMBINE_MIN
 	physics_material_override = mat
 
 	var cshape := CollisionShape2D.new()
@@ -22,17 +26,15 @@ func setup(r: float, c: Color, m_val: int = 10) -> void:
 	cshape.shape  = circle
 	add_child(cshape)
 
-	linear_velocity = Vector2(randf_range(-280.0, 280.0), randf_range(-200.0, 80.0))
+	linear_velocity = Vector2(randf_range(-280.0, 280.0), randf_range(-180.0, 60.0))
 	queue_redraw()
 
-const MIN_SPEED: float = 100.0
-
-func _physics_process(_delta: float) -> void:
+func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 	if collected:
 		return
-	if linear_velocity.length_squared() < MIN_SPEED * MIN_SPEED:
-		var dir := Vector2(randf_range(-1.0, 1.0), randf_range(0.2, 1.0)).normalized()
-		linear_velocity = dir * MIN_SPEED
+	if state.linear_velocity.length_squared() < MIN_SPEED * MIN_SPEED:
+		var angle := randf() * TAU
+		state.linear_velocity = Vector2(cos(angle), sin(angle)) * MIN_SPEED
 
 func _draw() -> void:
 	draw_circle(Vector2(3.0, 5.0), radius * 0.95, Color(0.0, 0.0, 0.0, 0.22))

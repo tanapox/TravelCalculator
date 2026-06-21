@@ -327,7 +327,7 @@ func _begin_shooting() -> void:
 
 func _start_collecting() -> void:
 	_phase = Phase.COLLECTING
-	_collect_timer = 20.0
+	_collect_timer = 8.0
 	_terrain.stop_firing()
 	_remove_barrier()
 	for b in _balls:
@@ -487,7 +487,8 @@ func _all_balls_done() -> bool:
 		if not is_instance_valid(b):
 			continue
 		var ball := b as Ball
-		if not ball.collected and not ball.sleeping:
+		if not ball.collected and not ball.sleeping \
+				and ball.linear_velocity.length_squared() > 100.0:
 			return false
 	return true
 

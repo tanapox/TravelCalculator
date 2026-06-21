@@ -353,8 +353,6 @@ func _on_weapon_fired() -> void:
 func _on_level_up(new_level: int) -> void:
 	if _shop:
 		_shop._on_level_up(new_level)
-	if _terrain:
-		_terrain.reinit()
 
 # ── Input ─────────────────────────────────────────────────────────────────────
 

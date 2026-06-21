@@ -24,7 +24,7 @@ func setup(r: float, c: Color, m_val: int = 10) -> void:
 	angular_damp          = 2.0
 
 	var mat := PhysicsMaterial.new()
-	mat.bounce   = BOUNCE_START
+	mat.bounce   = 0.05   # quasi nessun rimbalzo prima del gate
 	mat.friction = 0.85
 	physics_material_override = mat
 
@@ -41,12 +41,6 @@ func start_falling() -> void:
 	_settled = false
 	physics_material_override.bounce = BOUNCE_START
 
-func _physics_process(_delta: float) -> void:
-	if collected or _settled:
-		return
-	if _falling and linear_velocity.length_squared() < 36.0:
-		_settle()
-
 func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 	if collected:
 		return
@@ -59,13 +53,9 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 		physics_material_override.bounce = maxf(BOUNCE_END, b - BOUNCE_STEP)
 		state.linear_velocity.x += randf_range(-6.0, 6.0)
 		if physics_material_override.bounce <= BOUNCE_END:
-			_settle()
+			_settled = true
 			state.linear_velocity = Vector2.ZERO
 			state.angular_velocity = 0.0
-
-func _settle() -> void:
-	_settled = true
-	physics_material_override.bounce = 0.0
 
 func _draw() -> void:
 	draw_circle(Vector2(3.0, 5.0), radius * 0.95, Color(0.0, 0.0, 0.0, 0.22))

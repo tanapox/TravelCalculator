@@ -1,0 +1,28 @@
+; Engine configuration file.
+
+config_version=5
+
+[application]
+
+config/name="Palline"
+config/features=PackedStringArray("4.3", "GL Compatibility")
+config/icon="res://icon.svg"
+run/main_scene="res://scenes/Main.tscn"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/resizable=true
+window/size/mode=3
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+
+[autoload]
+
+GameState="*res://scripts/GameState.gd"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

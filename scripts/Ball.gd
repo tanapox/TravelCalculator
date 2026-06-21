@@ -46,8 +46,9 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 		return
 	if _falling and state.get_contact_count() > 0 and global_position.y < BUCKET_Y:
 		var b := physics_material_override.bounce
-		physics_material_override.bounce = maxf(BOUNCE_END, b - BOUNCE_STEP)
-		state.linear_velocity.x += randf_range(-6.0, 6.0)
+		if b > BOUNCE_END:
+			physics_material_override.bounce = maxf(BOUNCE_END, b - BOUNCE_STEP)
+			state.linear_velocity.x += randf_range(-6.0, 6.0)
 
 func _draw() -> void:
 	draw_circle(Vector2(3.0, 5.0), radius * 0.95, Color(0.0, 0.0, 0.0, 0.22))

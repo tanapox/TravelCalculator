@@ -19,11 +19,12 @@ func setup(r: float, c: Color, m_val: int = 10) -> void:
 	can_sleep             = false
 	contact_monitor       = true
 	max_contacts_reported = 4
-	linear_damp           = 0.25
+	linear_damp           = 1.2
+	angular_damp          = 4.0
 
 	var mat := PhysicsMaterial.new()
 	mat.bounce   = BOUNCE_START
-	mat.friction = 0.05
+	mat.friction = 0.85
 	physics_material_override = mat
 
 	var cshape := CollisionShape2D.new()
@@ -45,6 +46,8 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 		physics_material_override.bounce = maxf(BOUNCE_END, b - BOUNCE_STEP)
 		if _falling:
 			state.linear_velocity.x += randf_range(-6.0, 6.0)
+		if physics_material_override.bounce <= BOUNCE_END:
+			state.linear_velocity *= 0.65
 
 func _draw() -> void:
 	draw_circle(Vector2(3.0, 5.0), radius * 0.95, Color(0.0, 0.0, 0.0, 0.22))

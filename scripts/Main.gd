@@ -2,9 +2,10 @@ extends Node2D
 
 # ── Costanti layout ───────────────────────────────────────────────────────────
 
-const W:     int = 1280
-const H:     int = 720
-const TOP_H: int = H / 3   # 240 px
+const W:         int = 1280
+const H:         int = 720
+const TOP_H:     int = H / 3   # 240 px
+const BARRIER_Y: int = 100     # y della sbarra che ferma le palline prima del gate
 
 const SECTION_COLORS: Array = [
 	Color(0.09, 0.06, 0.15),
@@ -241,7 +242,7 @@ func _create_barrier() -> void:
 	_remove_barrier()
 
 	_barrier = StaticBody2D.new()
-	_barrier.position = Vector2(W / 2.0, float(TOP_H))
+	_barrier.position = Vector2(W / 2.0, float(BARRIER_Y))
 	var cs   := CollisionShape2D.new()
 	var rect := RectangleShape2D.new()
 	rect.size   = Vector2(float(W) + 40.0, 12.0)
@@ -251,8 +252,8 @@ func _create_barrier() -> void:
 
 	# Visuale della sbarra
 	_barrier_vis = Line2D.new()
-	_barrier_vis.add_point(Vector2(0.0, float(TOP_H)))
-	_barrier_vis.add_point(Vector2(float(W), float(TOP_H)))
+	_barrier_vis.add_point(Vector2(0.0, float(BARRIER_Y)))
+	_barrier_vis.add_point(Vector2(float(W), float(BARRIER_Y)))
 	_barrier_vis.width         = 6.0
 	_barrier_vis.default_color = Color(1.0, 0.75, 0.15, 0.95)
 	_barrier_vis.z_index       = 60
@@ -283,7 +284,7 @@ func _spawn_balls() -> void:
 		const LW := DestructibleArea.LAUNCHER_W
 		ball.position = Vector2(
 			randf_range(LW + r + 4.0, W - LW - r - 4.0),
-			randf_range(r + 4.0, TOP_H - r - 8.0)
+			randf_range(r + 4.0, BARRIER_Y - r - 8.0)
 		)
 		add_child(ball)
 		ball.setup(r, BALL_COLORS[color_idx], BALL_VALUES[color_idx])

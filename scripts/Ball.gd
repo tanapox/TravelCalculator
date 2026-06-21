@@ -14,10 +14,8 @@ func setup(r: float, c: Color, m_val: int = 10) -> void:
 	money_value = m_val
 
 	var mat := PhysicsMaterial.new()
-	mat.bounce              = 0.92
-	mat.bounce_combine_mode = 1  # COMBINE_MAX: vince sempre il valore più alto
-	mat.friction              = 0.0
-	mat.friction_combine_mode = 2  # COMBINE_MIN
+	mat.bounce   = 1.0
+	mat.friction = 0.0
 	physics_material_override = mat
 
 	var cshape := CollisionShape2D.new()

@@ -45,11 +45,11 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 	if collected:
 		return
 	if _settled:
-		if abs(state.linear_velocity.y) < 30.0:
+		if state.linear_velocity.length_squared() < 400.0:
 			state.linear_velocity = Vector2.ZERO
 			state.angular_velocity = 0.0
 		else:
-			state.linear_velocity.x *= 0.85
+			state.linear_velocity.x *= 0.90
 		return
 	if _falling and state.get_contact_count() > 0:
 		var b := physics_material_override.bounce

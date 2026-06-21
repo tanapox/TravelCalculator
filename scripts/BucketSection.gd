@@ -132,6 +132,9 @@ func _make_peg(pos: Vector2) -> void:
 	_peg_positions.append(pos)
 	var body   := StaticBody2D.new()
 	body.position = pos
+	var mat    := PhysicsMaterial.new()
+	mat.bounce = 0.9
+	body.physics_material_override = mat
 	var cs     := CollisionShape2D.new()
 	var circle := CircleShape2D.new()
 	circle.radius = PEG_R

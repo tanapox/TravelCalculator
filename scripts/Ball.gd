@@ -17,8 +17,10 @@ func setup(r: float, c: Color, m_val: int = 10) -> void:
 	ball_color  = c
 	money_value = m_val
 
-	can_sleep    = false
-	linear_damp  = 0.25   # lieve attrito dell'aria
+	can_sleep             = false
+	contact_monitor       = true
+	max_contacts_reported = 4
+	linear_damp           = 0.25
 
 	var mat := PhysicsMaterial.new()
 	mat.bounce   = BOUNCE_START

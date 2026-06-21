@@ -289,7 +289,7 @@ func _start_round() -> void:
 	_round += 1
 
 	_clear_balls()
-	_terrain.set_active_rows(mini(_round, GameState.terrain_rows))
+	_terrain.set_active_rows(GameState.terrain_rows_at_level(_round))
 	_terrain.reinit()
 	_spawn_balls()
 	_create_barrier()

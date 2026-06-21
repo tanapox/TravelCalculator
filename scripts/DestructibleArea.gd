@@ -595,7 +595,10 @@ func _circle_dmg(center: Vector2, radius: float, damage: float) -> void:
 				continue
 			var dist := _cell_to_local(c, r).distance_to(center)
 			if dist <= radius:
-				_dmg_idx(r * COLS + c, damage * (0.25 + 0.75 * (1.0 - dist / radius)))
+				var idx := r * COLS + c
+				var dmg := damage * (0.25 + 0.75 * (1.0 - dist / radius))
+				if dmg >= _hp[idx]:
+					_dmg_idx(idx, 9999.0)
 
 func _dmg_idx(idx: int, amount: float) -> void:
 	if _hp[idx] <= 0.0:

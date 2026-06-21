@@ -21,8 +21,8 @@ const BALL_COLORS: Array = [
 const BALL_VALUES: Array     = [10, 20, 15, 25, 30, 50, 35, 40]
 const BALL_COUNT_MIN: int    = 6
 const BALL_COUNT_MAX: int    = 14
-const BALL_RADIUS_MIN: float = 14.0
-const BALL_RADIUS_MAX: float = 46.0
+const BALL_RADIUS_MIN: float = 8.0
+const BALL_RADIUS_MAX: float = 22.0
 
 # ── Fasi del round ────────────────────────────────────────────────────────────
 
@@ -92,9 +92,15 @@ func _setup_background() -> void:
 
 func _setup_walls() -> void:
 	const T := 24
-	_make_wall(Vector2(W / 2.0, -T / 2.0),  Vector2(W + T * 2, T))
-	_make_wall(Vector2(-T / 2.0,   TOP_H),   Vector2(T, TOP_H * 2 + T * 2))
-	_make_wall(Vector2(W + T / 2.0, TOP_H),  Vector2(T, TOP_H * 2 + T * 2))
+	const LW := DestructibleArea.LAUNCHER_W   # 80
+	# Soffitto
+	_make_wall(Vector2(W / 2.0, -T / 2.0),       Vector2(W + T * 2, T))
+	# Pareti esterne (coprono sezioni medie e basse)
+	_make_wall(Vector2(-T / 2.0,   TOP_H),        Vector2(T, TOP_H * 2 + T * 2))
+	_make_wall(Vector2(W + T / 2.0, TOP_H),       Vector2(T, TOP_H * 2 + T * 2))
+	# Pareti interne nella zona palline (x=LW e x=W-LW) — stessa larghezza del terreno
+	_make_wall(Vector2(LW - T / 2.0, TOP_H / 2),  Vector2(T, TOP_H + T))
+	_make_wall(Vector2(W - LW + T / 2.0, TOP_H / 2), Vector2(T, TOP_H + T))
 
 func _make_wall(pos: Vector2, size: Vector2) -> void:
 	var body   := StaticBody2D.new()
@@ -261,8 +267,9 @@ func _spawn_balls() -> void:
 		var r         := randf_range(BALL_RADIUS_MIN, BALL_RADIUS_MAX)
 		var color_idx := randi() % BALL_COLORS.size()
 		var ball := Ball.new()
+		const LW := DestructibleArea.LAUNCHER_W
 		ball.position = Vector2(
-			randf_range(r + 4.0, W - r - 4.0),
+			randf_range(LW + r + 4.0, W - LW - r - 4.0),
 			randf_range(r + 4.0, TOP_H - r - 8.0)
 		)
 		add_child(ball)
@@ -310,7 +317,14 @@ func _start_collecting() -> void:
 	_phase = Phase.COLLECTING
 	_collect_timer = 20.0
 	_terrain.stop_firing()
+	_terrain.disable_all_physics()
 	_remove_barrier()
+	# Spinta verso il basso per le palline con velocità verticale troppo bassa
+	for b in _balls:
+		if is_instance_valid(b):
+			var v: Vector2 = (b as RigidBody2D).linear_velocity
+			if v.y < 150.0:
+				(b as RigidBody2D).linear_velocity = Vector2(v.x, 150.0)
 	_show_flash("RACCOLTA!", Color(0.4, 1.0, 0.5))
 	_update_hud()
 

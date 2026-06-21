@@ -208,6 +208,11 @@ func set_active_rows(n: int) -> void:
 	_active_rows = clampi(n, 1, ROWS)
 	_update_region()
 
+func disable_all_physics() -> void:
+	for body in _physics_rows:
+		for child in (body as StaticBody2D).get_children():
+			child.free()
+
 func _update_region() -> void:
 	if _sprite:
 		_sprite.region_rect = Rect2(0, 0, float(COLS * CELL), float(_active_rows * CELL))
